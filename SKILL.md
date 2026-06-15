@@ -1,8 +1,9 @@
 ---
 name: dre-workflow
-description: "Doll Reconstruction Engineer (DRE) 工作流：将参考角色图转化为标准化人偶角色，同时提取外观资产构建训练数据集。"
-version: 1.0.0
+description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures while extracting appearance assets for training datasets."
+version: 1.1.0
 platforms: [macos, linux]
+repository: https://github.com/ashesxera/hermes-dre-workflow
 ---
 
 # DRE 工作执行方案
@@ -898,3 +899,30 @@ Appearance = (A1×3 + A2×3 + A3×2 + A4×1 + A5×2) / 11 × 100
 - `references/bunny-chibi-case-study.md` — 第二个完整案例，
   包含 Stage 0 面部留白预处理、双参考图超时回退、蝴蝶结编号策略、
   Stage 7 Shape 外观干扰分析。
+
+## 版本管理
+
+本技能通过 Git 管理，托管于 GitHub：
+
+```
+仓库: https://github.com/ashesxera/hermes-dre-workflow
+路径: ~/.hermes/skills/doll-reconstruction/dre-workflow/
+```
+
+### 更新流程
+
+```bash
+cd ~/.hermes/skills/doll-reconstruction/dre-workflow
+git add -A
+git commit -m "描述变更"
+git push
+```
+
+### 迁移到新主机
+
+```bash
+# 在新主机上克隆
+mkdir -p ~/.hermes/skills/doll-reconstruction
+git clone git@github.com:ashesxera/hermes-dre-workflow.git \
+  ~/.hermes/skills/doll-reconstruction/dre-workflow
+```
