@@ -1,95 +1,103 @@
 ---
 name: dre-workflow
-description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures while extracting appearance assets for training datasets."
-version: 1.1.0
+description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.0: 6-step pipeline with internal vision, auto-validation, and iterative generation."
+version: 2.0.0
 platforms: [macos, linux]
 repository: https://github.com/ashesxera/hermes-dre-workflow
 ---
 
-# DRE 工作执行方案
+# DRE 工作执行方案 v2.0
 
 > 基于 Doll Reconstruction Workflow 制定
 > 全局优先级：**Shape > Pose > Appearance**
+> 视觉能力：主模型内部多模态视觉（图片加载至上下文直接分析）
+
+---
+
+## 核心变更（v2.0）
+
+| 维度 | v1.x | v2.0 |
+|------|------|------|
+| 阶段数 | 8 Stages | 6 Steps |
+| 视觉工具 | `vision_analyze` 外部调用 | 主模型内部视觉能力 |
+| 预处理 | Stage 0 独立阶段 | 并入 Step 2 提示词增强 |
+| 姿势处理 | Stage 4 独立"姿势底座" | 并入最终提示词一次性生成 |
+| 资产提取 | Stage 5 并行轨道 | **移除**（专注生产） |
+| Step 2 验证 | 人工检查 checklist | **自动验证**，无需人工介入 |
+| 评分权重 | Shape 40% | **Shape 45%** |
+
+---
 
 ## 项目目录结构
 
 ```
 ~/DRE_Projects/{project_name}/
 ├── input/
-│   ├── reference.png              # 原始参考图（用户提供）
-│   ├── reference_cleaned.png      # 清理后的参考图（Stage 0 产出）
-│   └── template.png               # 标准人偶模板（可选，自动从技能资产复制）
-├── stage_0_preprocess/
-│   └── preprocess_report.md       # 预处理报告
-├── stage_1_analysis/
-│   └── appearance_report.md       # 结构化外观报告
-├── stage_2_pose/
-│   └── pose_prompt.md             # 姿势提示词
-├── stage_3_base/
-│   └── doll_base.png              # 标准人偶底座
-├── stage_4_posed/
-│   └── posed_doll_base.png        # 已摆姿势的人偶底座
-├── stage_5_assets/                # ⚠️ 并行轨道，不阻塞 Stage 6
-│   ├── hair_asset.png
-│   ├── clothing_asset.png
-│   ├── footwear_asset.png
-│   ├── accessory_asset.png
-│   └── asset_metadata.md
-├── stage_6_reconstruction/
-│   ├── iterations/                # 🆕 所有迭代输出（不覆盖）
-│   │   ├── README.md              # 迭代总览
-│   │   ├── r1/
-│   │       ├── output.png
-│   │       └── report.md
-│   └── README.md                 # 迭代总览
-│   │       ├── output.png
-│   │       └── report.md
-│   └── README.md                 # 迭代总览
-│   │       ├── output.png
-│   │       └── report.md
-│   └── README.md                 # 迭代总览
-│   │       ├── output.png
-│   │       └── report.md
-│   └── README.md                 # 迭代总览
-│   │       ├── output.png
-│   │       └── report.md
-│   └── README.md                 # 迭代总览
-    ├── ranking.md                  # 打分排名（Stage 7 产出）
-    └── verification_report.md      # 详细验证报告
+│   └── reference.png                              # 原始参考图（用户提供）
+│
+├── step_1_reference_analysis/
+│   └── analysis_report.md                         # 参考图视觉分析报告
+│
+├── step_2_prompt_construction/
+│   ├── prompt_raw.md                              # Step 1 原始外观提示词
+│   ├── prompt_stage0_enhanced.md                  # Step 2 增强后提示词
+│   ├── auto_validation_report.md                  # Step 2 自动验证报告
+│   └── prompt_final.md                            # Step 4 最终融合提示词
+│
+├── step_3_template_analysis/
+│   └── template_report.md                         # 标准模特视觉分析报告
+│
+├── step_5_iterations/
+│   ├── r1/
+│   │   ├── output.png                             # R1 生成图
+│   │   ├── prompt.md                              # R1 使用的完整提示词
+│   │   └── inspection_report.md                   # R1 视觉检验报告
+│   ├── r2/
+│   ├── r3/
+│   ├── r4/
+│   ├── r5/
+│   └── README.md                                  # 迭代总览索引
+│
+└── step_6_final_evaluation/
+    ├── ranking.md                                 # 排名表
+    └── evaluation_report.md                       # 详细评估报告
 ```
 
 ### 默认模板
 
-技能内置标准人偶模板，路径：
+技能内置标准人偶模板：
 
 ```
 ~/.hermes/skills/doll-reconstruction/dre-workflow/assets/default_template.png
 ```
 
-- 2.2 头身 Q 版潮玩素体
+- ~1.8 头身 Q 版潮玩素体
 - 暖米白 + 淡粉配色
 - 纯白背景
 - 100% 镜像对称
+- 面部完全留白（无五官）
 
-**用户无需提供模板**。如用户提供了自定义模板，则优先使用自定义模板。
+**用户无需提供模板**。如用户提供了自定义模板（`input/template.png`），则优先使用。
+
+---
 
 ## 全局约束
 
 ```
 优先级（高→低）：Shape > Pose > Appearance
 
-Shape（人偶底座权威）：
+Shape（人偶底座权威 — 绝对优先）：
   - 头部形状/大小/宽高比
-  - 面部轮廓
-  - 身体比例（头身比）
+  - 面部轮廓（必须完全留白）
+  - 身体比例（头身比 ~1.8）
   - 躯干宽度
   - 四肢粗细
   - 脚部尺寸
   - 整体轮廓
-  - 材质表现（聚乙烯塑料）
-  - 🔴 面部留白：**绝对禁止五官**。标准模板为无脸设计（被刘海覆盖的光滑弧面），
-    最终成品必须保持面部完全空白——无眼睛、无眉毛、无鼻子、无嘴巴、无腮红。
+  - 材质表现（哑光软胶 PVC）
+  - 🔴 面部留白：绝对禁止五官。无眼睛、无眉毛、无鼻子、无嘴巴、无腮红。
     任何五官痕迹均视为 Shape 层违规，直接判定不合格。
+  - 🔴 肢体数量：EXACTLY 两条手臂 + EXACTLY 两条腿。无额外肢体。
 
 Pose（参考图权威）：
   - 关节旋转
@@ -98,807 +106,593 @@ Pose（参考图权威）：
   - 重心分布
 
 Appearance（参考图权威）：
-  - 发型/发饰
+  - 发型（塑料块状，无镂空）
   - 服装（颜色+形状，材质统一为塑料）
   - 鞋履
   - 配饰/道具
   - 色彩方案
 ```
 
+---
+
+## 视觉能力调用规范（v2.0 核心）
+
+**本工作流所有视觉分析均使用主模型内部多模态视觉能力，不再调用 `vision_analyze` 工具。**
+
+标准调用方式：
+
+```
+1. 将目标图片加载到当前对话上下文（作为附件/引用）
+2. 向主模型发送结构化视觉分析指令
+3. 主模型利用内部视觉能力直接输出分析结果
+4. 将结果写入对应 markdown 文件归档
+```
+
+**多图对比模式**（Step 5 检验、Step 6 评比）：
+
+```
+1. 将多张图片同时加载到上下文（生成图、模板图、参考图）
+2. 主模型一次性跨图对比，直接输出判定结果
+3. 写入报告
+```
+
+---
+
 ## 执行顺序
 
 ```
-Stage 0 → Stage 1 → Stage 2 → Stage 3 → Stage 4 → Stage 6 (≤5轮) → Stage 7 (打分排序)
-                                                          │                                            │
-                                                          └──→ Stage 5（并行）─────────────────────────┘
+Step 1 → Step 2 → Step 3 → Step 4 → Step 5 (≤5轮) → Step 6
 ```
 
-- **Stage 0 必须最先执行**，清理参考图中的背景杂物和无关元素
-- Stage 1 → 2 → 3 → 4 必须顺序执行
-- Stage 5 可在 Stage 1 完成后随时启动，与 Stage 2-6 并行
-- Stage 6 依赖 Stage 4 完成，不依赖 Stage 5
-- **Stage 6 上限 5 轮**，超过后强制进入 Stage 7
-- Stage 7 对所有 Stage 6 输出打分排序，产出 `ranking.md` + `verification_report.md`
+- Step 1-4 必须顺序执行
+- Step 5 上限 **5 轮**，超过后强制进入 Step 6
+- Step 6 对 Step 5 全部输出打分排序
 
 ### API 资源约束
 
-- Stage 6 每轮消耗 1 次 `image_gen` 调用 + 1 次 `vision_analyze` 验证
-- 5 轮上限 = 最多 5 次 image_gen + 5 次 vision_analyze
-- Stage 7 额外消耗 N 次 vision_analyze（N = 实际生成轮数）
-- 如某轮提前全部通过，可提前终止，节省资源
+- Step 5 每轮消耗 1 次 `image_gen` 调用
+- 5 轮上限 = 最多 5 次 `image_gen`
+- 视觉分析全部内化，**零外部视觉 API 消耗**
 
-## Stage 0 — 图片预处理（清理背景与无关元素）
+---
 
-> 🔴 必须最先执行。参考图可能包含复杂背景、九宫格参考线、悬空装饰物等，
-> 必须先清理为干净的纯白背景 + 仅保留主体娃娃。
+## Step 1 — 参考图视觉分析与提示词提取
+
+### 目的
+用主模型内部视觉能力分析参考图，提取所有客观外观信息，写成英文绘图提示词。
 
 ### 输入
-
 | 项目 | 来源 | 格式 |
 |------|------|------|
 | 原始参考图 | 用户提供 | PNG/JPG |
 
-### 操作方式
+### 操作
 
-#### 0.1 识别需要清理的元素
-
-使用 `vision_analyze` 加载原始参考图，识别以下类别：
-
-| 类别 | 示例 | 处理方式 |
-|------|------|----------|
-| 背景杂色/纹理 | 渐变背景、纸张纹理 | 替换为纯白 |
-| 参考线/网格 | 九宫格线、裁剪标记 | 移除 |
-| 悬空装饰物 | 浮动的胡萝卜、蝴蝶结、星星、花朵 | 移除 |
-| 边缘裁切元素 | 被画框裁断的物体残片 | 移除 |
-| 文字/水印 | 签名、URL、版权标记 | 移除 |
-| 主体娃娃 | 角色本体 + 附着物（头饰、手持物、头顶物） | ✅ 保留 |
-| 娃娃的附着配件 | 头发上的蝴蝶结、头顶的宠物、怀中的道具 | ✅ 保留 |
-
-**判断原则**：
-- 与娃娃身体直接接触或附着的 → 保留
-- 悬浮在空中、独立于娃娃之外的 → 移除
-- 被画面边缘裁切的不完整物体 → 移除
-
-#### 0.2 生成清理后的参考图
-
-调用 `image_gen`，使用原始参考图作为参考：
+1. 将 `input/reference.png` 加载到主模型上下文
+2. 发送结构化分析指令，要求按以下维度输出：
 
 ```
-Prompt 模板：
-"[主体娃娃的完整外观描述 — 从 Stage 0.1 的 vision_analyze 结果中提取]。
-🔴 外观描述中绝对不要包含任何五官描述（眼睛、眉毛、鼻子、嘴巴、腮红）。
-
-Pure white background, NO grid lines, NO floating objects, 
-NO extra decorations, NO text, NO watermarks. 
-ONLY the main subject on a clean white background.
-
-🔴 CRITICAL: The face is COMPLETELY BLANK — NO eyes, NO eyebrows, 
-NO nose, NO mouth, NO blush. The face area is a smooth featureless 
-surface, exactly like a blank vinyl art toy. Keep the face empty.
+分析维度：
+  - 整体构图：人物在画面中的位置、朝向、重心脚
+  - 头部：朝向（正视/侧视/俯视/仰视）、倾斜角度与方向
+  - 发型：类型、长度、颜色、刘海形态、鬓发、发饰、特殊造型
+  - 服装：上装、下装、外套、袖型、领型、腰带、层叠关系、颜色、纹样
+  - 鞋履：鞋型、袜子、颜色
+  - 配饰：头饰、包袋、首饰、手持道具、其他装饰物
+  - 特殊面部标记：创可贴、伤疤、贴纸、面具等（⚠️ 明确区别于五官）
+  - 姿势：双臂位置、双腿位置、躯干旋转、重心分布
+  - 色彩方案：主色、辅色、点缀色
+  - 氛围/风格：可爱、冷酷、复古等（仅作渲染风格参考，不改变材质）
 ```
 
-参考图：原始参考图
-```
+3. 将分析结果转化为**详细的英文绘图提示词**。
 
-#### 0.3 验证清理结果
-
-使用 `vision_analyze` 检查清理后的图片：
-
-| # | 检查项 | 判定 |
-|---|--------|------|
-| 1 | 背景为纯白 | ✅/❌ |
-| 2 | 无参考线/网格 | ✅/❌ |
-| 3 | 无悬空装饰物 | ✅/❌ |
-| 4 | 无边缘裁切残片 | ✅/❌ |
-| 5 | 无文字/水印 | ✅/❌ |
-| 6 | 主体娃娃完整保留 | ✅/❌ |
-| 7 | 附着配件完整保留 | ✅/❌ |
-| 🔴 8 | 面部完全留白（无五官） | ✅/❌ |
-
-如任一检查不通过 → 调整 prompt 重新生成。
-
-#### 0.4 面部留白处理
-
-面部留白约束已嵌入 §0.2 的 prompt 模板和 §0.3 的验证清单（第 8 项）。
-Stage 0 输出 `reference_cleaned.png` 直接就是无脸版本，
-后续 Stage 6 不再需要处理五官泄漏问题。
+### 约束
+- **禁止**写入任何身体比例描述（如"头身比"、"Q版"、"大头"等）。这些属于 Step 3 的标准模特范畴。
+- **禁止**写入背景描述（背景在 Step 2 统一处理）。
+- 对五官的描述**暂时保留**（Step 2 会统一清除）。
 
 ### 输出
-
 | 产物 | 路径 | 格式 |
 |------|------|------|
-| 清理后的参考图 | `input/reference_cleaned.png` | PNG（纯白背景） |
-| 预处理报告 | `stage_0_preprocess/preprocess_report.md` | Markdown |
+| 视觉分析报告 | `step_1_reference_analysis/analysis_report.md` | Markdown |
+| 原始外观提示词 | `step_2_prompt_construction/prompt_raw.md` | Markdown |
 
-### 目录结构
+---
 
-```
-stage_0_preprocess/
-├── preprocess_report.md       # 清理报告（原始图分析 + 移除清单 + 验证结果）
-└── (中间产物可选保留)
-```
+## Step 2 — 提示词增强 + 自动验证
 
-### 后续阶段引用
-
-Stage 1 及之后所有阶段使用 `input/reference_cleaned.png` 作为参考图，
-不再使用原始参考图。
+### 目的
+在原始提示词上叠加强制性约束层：清空背景、去除五官、发型塑料玩偶化。并**自动验证**，无需人工介入。
 
 ### 输入
+| 项目 | 来源 |
+|------|------|
+| 原始外观提示词 | `step_2_prompt_construction/prompt_raw.md` |
+| 原始参考图 | `input/reference.png` |
 
-| 项目 | 来源 | 格式 |
-|------|------|------|
-| 清理后的参考图 | `input/reference_cleaned.png`（Stage 0 产出） | PNG |
+### 操作
 
-### 操作方式
+#### 2.1 三要素增强
 
-1. 使用 `vision_analyze` 加载清理后的参考图
-2. 按以下维度逐一提取信息：
+**要素 A — 清空背景与漂浮道具**
+- 在提示词末尾追加：
+  ```
+  Pure white background, no background objects, no floating props,
+  no decorative elements suspended in the air, no text, no watermarks.
+  ```
+- 如参考图中存在与主体无物理接触的悬空装饰（漂浮星星、散落花瓣等），在提示词中明确排除。
+
+**要素 B — 去除五官，保留特殊面部标记**
+- **绝对清除**：眼睛、眉毛、鼻子、嘴巴、腮红、睫毛、美瞳、唇色。
+- **保留例外**：创可贴、伤疤、贴纸、面罩、眼罩、机械纹路等非五官类面部标记。
+- 追加约束：
+  ```
+  The face is completely blank and smooth — no eyes, no eyebrows,
+  no nose, no mouth, no blush. The facial area is a featureless
+  vinyl surface.
+  ```
+- 如有合法例外：
+  ```
+  [Exception: A small band-aid on the left cheek is preserved.]
+  ```
+
+**要素 C — 发型塑料玩偶化**
+- **禁止**：发丝镂空、空气感层次、飘逸碎发、尖锐发梢。
+- **允许**：浮雕状线条表现发束走向、整体块状造型、圆润发梢。
+- 追加约束：
+  ```
+  Hair is rendered as solid vinyl-like masses with embossed line
+  details showing strand direction. No hollow or airy layered effects.
+  Hair tips are rounded and blunt, not sharp or spiky. The hairstyle
+  has a toy-like solid plastic appearance with soft molded edges.
+  ```
+
+#### 2.2 自动验证
+
+Step 2 产出 `prompt_stage0_enhanced.md` 后，**立即触发自动验证**。
+
+**验证流程**：
 
 ```
-姿势信息：
-  - 身体朝向（正面/侧面/背面/半侧）
-  - 躯干旋转角度（定性：轻微/明显/大幅）
-  - 头部方向（正视/侧视/仰视/俯视）
-  - 手臂位置（左右分别描述）
-  - 手部姿态
-  - 腿部位置（左右分别描述）
-  - 重心分布
+验证输入：
+  - 原始参考图（加载到主模型上下文）
+  - prompt_raw.md
+  - prompt_stage0_enhanced.md
 
-外观信息：
-  🔴 面部五官不提取 — 成品必须无脸（参考 Shape 层约束）
-  头发：
-    - 发型类型
-    - 发量/长度
-    - 刘海样式
-    - 鬓发/侧发
-    - 马尾/辫子
-    - 发饰
+验证执行：
+  1. 主模型对比三份材料，执行自动检查
 
-  服装：
-    - 上装
-    - 下装
-    - 外套
-    - 袖型
-    - 领型
-    - 腰带/腰封
+  【检查项 A — 背景清除】
+  - 增强后提示词是否包含 "pure white background" 或等效表述
+  - 是否明确排除漂浮道具、文字、水印
+  - 自动判定：✅ 通过 / ❌ 缺失
 
-  鞋履：
-    - 鞋型
-    - 袜类
+  【检查项 B — 五官清除】
+  - 扫描增强后提示词全文，匹配禁用词库：
+    eyes, eyebrows, nose, mouth, lips, blush, eyelashes, pupils,
+    眼睛, 眉毛, 鼻子, 嘴巴, 唇, 腮红, 睫毛
+  - 如存在 → 标记位置，判定 ❌
+  - 如不存在 → 判定 ✅
+  - 例外检查：确认是否保留了"创可贴、伤疤、面罩"等合法标记
 
-  配饰：
-    - 头饰/发带
-    - 帽子
-    - 包袋
-    - 首饰
-    - 道具/武器
-    - 其他装饰
+  【检查项 C — 发型塑料化】
+  - 扫描关键词：
+    正向标记（应有）：solid, vinyl-like, embossed, rounded tips,
+                      blunt tips, molded edges, toy-like plastic
+    负向标记（应无）：hollow, airy, layered, flowing, wispy,
+                      sharp tips, spiky, transparent strands
+  - 正向标记 ≥2 个且负向标记 = 0 → ✅
+  - 否则 → ❌，并指出缺失/多余项
+
+  2. 输出自动验证报告
 ```
 
-3. 将结果写入结构化 markdown 报告
+**自动修复规则**：
+
+| 失败项 | 自动修复动作 |
+|--------|-------------|
+| 背景清除缺失 | 在提示词末尾追加标准背景清除语句 |
+| 五官词汇残留 | 定位并删除对应词汇；如为合法例外，保留并加注释 |
+| 发型塑料化不足 | 在发型描述段插入/替换为标准塑料化描述 |
+
+修复后**重新执行自动验证**，直至全部通过或达到 **3 次修复上限**。
 
 ### 输出
-
 | 产物 | 路径 | 格式 |
 |------|------|------|
-| 外观报告 | `stage_1_analysis/appearance_report.md` | Markdown |
+| 增强后提示词 | `step_2_prompt_construction/prompt_stage0_enhanced.md` | Markdown |
+| 自动验证报告 | `step_2_prompt_construction/auto_validation_report.md` | Markdown |
 
-### 检验方法
+### 自动验证报告格式
+```markdown
+# Step 2 自动验证报告
 
-- 人工目视确认报告覆盖了参考图中所有可见的外观元素
-- 确认报告未包含身体比例、解剖结构描述
-- 确认报告为纯客观描述，无主观评价
+## 检查项 A：背景清除
+- 状态: ✅ 通过
+- 命中关键词: "pure white background", "no floating props"
 
-## Stage 2 — 姿势提取
+## 检查项 B：五官清除
+- 状态: ✅ 通过
+- 禁用词扫描: 0 命中
+- 例外保留: "a small band-aid on left cheek" (合法)
+
+## 检查项 C：发型塑料化
+- 状态: ⚠️ 偏差（已自动修复）
+- 原始问题: 缺失正向标记 "solid", "molded edges"
+- 修复动作: 在发型段插入 "solid vinyl-like hair with molded edges"
+- 复验状态: ✅ 通过
+
+## 最终判定
+- 验证轮次: 2/3
+- 结论: 通过，进入 Step 3
+```
+
+---
+
+## Step 3 — 标准模特视觉分析
+
+### 目的
+独立分析标准模板图片，提取其外形比例和材质特征。**完全不涉及发型、穿着、姿势**。
 
 ### 输入
+| 项目 | 来源 |
+|------|------|
+| 标准人偶模板 | 默认：`assets/default_template.png`；自定义：`input/template.png` |
 
-| 项目 | 来源 | 格式 |
-|------|------|------|
-| 参考角色图 | `input/reference_cleaned.png` | PNG/JPG |
-| Stage 1 姿势分析结果 | `stage_1_analysis/appearance_report.md`（姿势部分） | Markdown |
+### 操作
 
-### 操作方式
+1. 将模板图加载到主模型上下文
+2. 发送结构化指令，要求仅回答以下问题：
 
-1. 从 Stage 1 报告中提取姿势信息作为基础
-2. 使用 `vision_analyze` 再次确认姿势细节（仅关注身体姿态，忽略外观）
-3. 将姿势信息转化为**对生图模型友好的自然语言描述**
-
-格式要求：
-- 使用定性描述，不需要精确角度数值
-- 使用生图模型容易理解的词汇（standing、sitting、arms crossed、looking left 等）
-- 保持简洁，聚焦于关键关节和身体朝向
-
-示例：
 ```
-Standing pose, facing slightly left.
-Torso gently rotated to the left.
-Head turned to face forward.
-Right arm raised to shoulder height, hand open.
-Left arm relaxed at side.
-Right leg forward, knee slightly bent.
-Left leg straight, bearing weight.
+分析维度（仅限结构与材质）：
+  - 头身比：头部高度占总身高的比例
+  - 头部特征：形状（圆/椭圆）、大小、宽度与肩宽的关系
+  - 身体：躯干长度、宽度、整体紧凑度
+  - 四肢：手臂长度与粗细、腿部长度与粗细、手脚大小
+  - 材质：表面光泽度（哑光/亮光）、质感（PVC/搪胶/软胶）、颜色
+  - 对称性：是否完全镜像对称
+  - 面部：是否为完全留白的光滑表面
 ```
 
-### 输出
+3. 将结果写成**纯结构+材质描述文本**，禁止出现任何服装/发型/姿势词汇。
 
-| 产物 | 路径 | 格式 |
-|------|------|------|
-| 姿势提示词 | `stage_2_pose/pose_prompt.md` | Markdown（纯文本描述） |
-
-### 检验方法
-
-- 阅读提示词，确认能在大脑中还原出与参考图一致的姿势
-- 确认描述未包含任何外观信息（发型、服装等）
-- 确认用词为生图模型常用词汇
-
-## Stage 3 — 标准人偶底座锁定
-
-### 输入
-
-| 项目 | 来源 | 格式 |
-|------|------|------|
-| 标准人偶模板 | 默认：`~/.hermes/skills/doll-reconstruction/dre-workflow/assets/default_template.png` | PNG |
-| 自定义模板（可选） | 用户提供时：`input/template.png` | PNG/JPG |
-
-### 操作方式
-
-1. 检查用户是否提供了自定义模板（`input/template.png` 是否存在）
-2. 如未提供 → 使用技能内置默认模板 `assets/default_template.png`
-3. 复制模板到 `stage_3_base/doll_base.png`
-4. 使用 `vision_analyze` 确认模板的关键结构特征：
-   - 头部形状与大小
-   - 头身比
-   - 四肢粗细
-   - 整体轮廓
-   - 材质表现（聚乙烯塑料光泽）
-5. 记录关键结构参数供后续验证使用
-
-### 输出
-
-| 产物 | 路径 | 格式 |
-|------|------|------|
-| 标准人偶底座 | `stage_3_base/doll_base.png` | PNG（白色背景） |
-| 结构参数报告 | `stage_3_base/base_structure_report.md` | Markdown |
-
-### 默认模板参数
+### 默认模板参数（基准值）
 
 | 参数 | 数值 |
 |------|------|
-| 头身比 | ~2.2（头部含发占 62% 总高） |
-| 头部最大宽度 | 0.73H |
-| 肩宽 | 0.47H |
-| 裙摆最大宽度 | 0.61H |
-| 手臂 | 短粗圆钝，无手指 |
-| 腿部 | 极短直筒 |
-| 脚部 | 大圆头鞋 |
-| 材质 | 哑光软胶塑料 |
+| 头身比 | ~1.8（头部含发占 56% 总高） |
+| 头部最大宽度 | 0.64H |
+| 肩宽 | 0.55H |
+| 手臂 | 短粗圆钝，无手指，长径比 ~1.57 |
+| 腿部 | 极短敦实，长径比 ~0.92 |
+| 脚部 | 大圆头包头鞋 |
+| 材质 | 哑光软胶 PVC（搪胶） |
 | 配色 | 暖米白 + 淡粉 |
 | 对称性 | 100% 镜像对称 |
-
-## Stage 4 — 姿势应用
-
-### 输入
-
-| 项目 | 来源 | 格式 |
-|------|------|------|
-| 标准人偶底座 | `stage_3_base/doll_base.png` | PNG |
-| 姿势提示词 | `stage_2_pose/pose_prompt.md` | Markdown |
-
-### 操作方式
-
-1. 读取姿势提示词文本
-2. 调用 `image_gen` 进行图文生图：
-
-```
-请求参数：
-  - 参考图：doll_base.png（作为结构基础）
-  - 文本提示词：pose_prompt.md 中的姿势描述
-  - 要求：保持人偶结构不变，仅改变姿势
-```
+| 面部 | 完全留白光滑表面 |
 
 ### 输出
-
 | 产物 | 路径 | 格式 |
 |------|------|------|
-| 已摆姿势的人偶底座 | `stage_4_posed/posed_doll_base.png` | PNG |
+| 标准模特分析报告 | `step_3_template_analysis/template_report.md` | Markdown |
 
-### 检验方法
+---
 
-1. 使用 `vision_analyze` 对比 `doll_base.png` 和 `posed_doll_base.png`：
-   - ✅ 头部大小一致
-   - ✅ 头身比一致
-   - ✅ 四肢粗细一致
-   - ✅ 整体轮廓一致
-   - ✅ 材质表现一致
-2. 使用 `vision_analyze` 对比 `reference.png` 和 `posed_doll_base.png`：
-   - ✅ 姿势方向一致
-   - ✅ 四肢位置大致匹配
-3. 如任一检查不通过 → 调整 prompt 重新生成
+## Step 4 — 提示词融合与优化
 
-### ⚠️ 关键陷阱：Q版模型抗拒头部不对称
-
-**问题**：生图模型对 Q 版/Chibi 造型有强烈的对称性偏好。
-当要求头部微倾斜时，模型倾向于忽略该指令并生成完全对称的头部。
-在 gothic_lolita_starry_night 项目中，前 3 轮均未能实现头部倾斜。
-
-**迭代策略**：
-1. R1: 温和描述 "head tilted very slightly" → 通常失败
-2. R2: 量化描述 "head tilted ~5 degrees" → 通常失败
-3. R3: 强调不对称 "the head is NOT perfectly straight, it leans to one side" → 可能失败
-4. R4: 空间化描述 "the left side of the head is higher than the right side" → 成功率较高
-
-**关键技巧**：使用空间化/视觉化语言而非角度数值。
-描述"左耳比右耳高"比"头部倾斜 5 度"更有效。
-在 prompt 中加入 "the figure must NOT be perfectly symmetrical" 作为负面约束。
-
-## Stage 5 — 外观资产提取 ⚠️ 并行轨道
-
-> 此阶段与 Stage 6 并行，不阻塞最终人偶生成。
-> 目的：构建长期训练数据集。
+### 目的
+将 Step 2 的外观提示词与 Step 3 的标准模特结构参数融合，生成最终绘图提示词。
 
 ### 输入
+| 项目 | 来源 |
+|------|------|
+| 增强后外观提示词 | `step_2_prompt_construction/prompt_stage0_enhanced.md` |
+| 标准模特结构报告 | `step_3_template_analysis/template_report.md` |
 
-| 项目 | 来源 | 格式 |
-|------|------|------|
-| 参考角色图 | `input/reference_cleaned.png` | PNG/JPG |
+### 操作
 
-### 操作方式
+1. 读取两个文件内容
+2. 按以下优先级拼接为最终提示词：
 
-#### 5.1 头发资产
+```
+[标准模特结构前置描述 — 高权重锚点]
+A chibi vinyl art toy figure with extreme deformed proportions:
+[Step 3 的结构参数，用自然语言重写].
+The body structure, head size, and limb proportions are locked
+and must not be altered.
 
-1. 使用 `vision_analyze` 识别头发区域和样式
-2. 使用 `image_gen` 生成仅包含发型的独立图片：
-   - Prompt：描述发型特征 + "white background, isolated hair asset, no face, no body"
-   - 参考图：reference.png（作为发型参考）
+[外观描述 — 来自参考图]
+[Step 2 增强后的完整外观描述：姿势、发型、服装、配饰、道具、色彩]
 
-#### 5.2 服装资产
+[材质与渲染收尾]
+Smooth matte vinyl plastic material, soft diffuse lighting,
+3D render style, pure white background.
 
-1. 使用 `vision_analyze` 识别服装部件
-2. 使用 `image_gen` 生成服装独立图片：
-   - Prompt：描述服装特征 + "white background, isolated clothing asset, flat lay"
+[强制性约束收尾]
+CRITICAL: The face remains completely blank with NO eyes,
+NO eyebrows, NO nose, NO mouth, NO blush. EXACTLY two arms
+and EXACTLY two legs. No extra limbs.
+```
 
-#### 5.3 鞋履资产
-
-1. 使用 `vision_analyze` 识别鞋履
-2. 使用 `image_gen` 生成鞋履独立图片
-
-#### 5.4 配饰资产
-
-1. 使用 `vision_analyze` 识别所有配饰
-2. 使用 `image_gen` 逐个生成配饰独立图片
-
-#### 5.5 元数据报告
-
-汇总所有资产信息，记录每个资产的描述、颜色、材质特征。
+3. **冲突消解**：
+   - 如外观描述中意外包含比例词汇（如"slender body"），删除或替换为符合标准模特的描述（"tiny compact body"）。
+   - 如外观描述中包含材质冲突（如"silky dress"），保留塑料质感描述，将"silky"降级为视觉纹理描述（"smooth plastic surface with embossed fabric texture"）。
 
 ### 输出
-
 | 产物 | 路径 | 格式 |
 |------|------|------|
-| 头发资产 | `stage_5_assets/hair_asset.png` | PNG（白色背景） |
-| 服装资产 | `stage_5_assets/clothing_asset.png` | PNG（白色背景） |
-| 鞋履资产 | `stage_5_assets/footwear_asset.png` | PNG（白色背景） |
-| 配饰资产 | `stage_5_assets/accessory_asset.png` | PNG（白色背景） |
-| 资产元数据 | `stage_5_assets/asset_metadata.md` | Markdown |
+| 最终融合提示词 | `step_2_prompt_construction/prompt_final.md` | Markdown |
 
-### 检验方法
+---
 
-- 每个资产图片中目标部件清晰可辨
-- 背景为纯白或接近纯白
-- 资产元数据描述准确
-- ⚠️ 不要求达到 LoRA 训练级精度，作为视觉参考即可
+## Step 5 — 多轮迭代生成与视觉检验（最多5轮）
 
-## Stage 6 — 外观引导重建（迭代式，上限 5 轮）
-
-> ⚠️ 硬限制：最多 5 轮迭代。超过 5 轮仍未达标 → 停止生成，进入 Stage 7 打分排序选出最优。
+### 目的
+利用 `image_gen` 的单/双图策略生成成品，每轮后主模型内部视觉检验，动态调整。
 
 ### 输入
+| 项目 | 来源 |
+|------|------|
+| 最终融合提示词 | `step_2_prompt_construction/prompt_final.md` |
+| 标准模特模板 | `assets/default_template.png` 或 `input/template.png` |
+| 原始参考图 | `input/reference.png`（双图策略时使用） |
 
-| 项目 | 来源 | 格式 |
-|------|------|------|
-| 参考角色图 | `input/reference_cleaned.png` | PNG/JPG |
-| 已摆姿势的人偶底座 | `stage_4_posed/posed_doll_base.png` | PNG |
-| 外观报告 | `stage_1_analysis/appearance_report.md`（外观部分） | Markdown |
-
-### 目录结构
-
-```
-stage_6_reconstruction/
-├── iterations/
-│   ├── r1/
-│   │   ├── output.png           # R1 生成图
-│   │   └── report.md            # R1 提示词 + 验证结果
-│   ├── r2/
-│   │   ├── output.png
-│   │   └── report.md
-│   ├── r3/
-│   │   ├── output.png
-│   │   └── report.md
-│   ├── r4/
-│   │   ├── output.png
-│   │   └── report.md
-│   ├── r5/
-│   │   ├── output.png
-│   │   └── report.md
-│   └── README.md                 # 迭代总览
-```
-
-### 迭代策略：混合双图/单图（含超时回退）
-
-采用 **2 轮双参考图 + 3 轮单参考图** 的固定混合策略：
+### 单/双图策略
 
 | 轮次 | 策略 | 参考图 | 目的 |
 |------|------|--------|------|
-| R1 | 双参考图 | posed_doll_base + reference | 外观信息最大化，接受比例可能漂移 |
-| R2 | 双参考图 | posed_doll_base + reference | 调整 prompt 修复 R1 缺陷 |
-| R3 | 单参考图 | posed_doll_base only | 锁定结构，外观纯文本 |
-| R4 | 单参考图 | posed_doll_base only | 调整外观描述修复 R3 缺陷 |
-| R5 | 单参考图 | posed_doll_base only | 最终精修 |
+| R1 | **双图** | 模板图 + 参考图 | 最大化外观信息输入，测试融合能力 |
+| R2 | **双图** | 模板图 + 参考图 | 基于 R1 检验修复缺陷 |
+| R3 | **单图** | 模板图 | 锁定结构，纯文本传递外观，纠正比例漂移 |
+| R4 | **单图** | 模板图 | 精修外观细节 |
+| R5 | **单图** | 模板图 | 最终精修或兜底 |
 
-**设计原理**：
-- R1-R2（双图）：利用 reference.png 的图像通道传递复杂视觉特征（印花纹理、配色细节），
-  即使比例漂移，外观信息密度最高。
-- R3-R5（单图）：切换为结构锁定模式，用前两轮积累的外观描述经验进行文本迁移，
-  确保最终输出比例正确。
-
-**超时回退策略**：
-双参考图模式可能因 prompt 过长或参考图复杂度高导致 `image_gen` 超时
-（在 bunny_chibi 项目中 R1 双图连续两次超时）。
-如双图轮次超时 → **直接跳过该轮，切换为单参考图模式继续**。
-单参考图模式极少超时，外观质量损失可控。
+**超时回退**：任何轮次如 `image_gen` 超时 → 自动切换为单图模式继续。
 
 ### 每轮操作流程
 
-#### 6.1 构建提示词
-
-**双参考图轮次（R1, R2）**：
-
 ```
-A chibi vinyl art toy doll figure with extreme deformed proportions 
-(oversized head ~62% of height, tiny compact body, short stubby rounded 
-arms with no fingers, very short straight legs, large round shoes).
-
-🔴 CRITICAL: The face is COMPLETELY BLANK — no eyes, no eyebrows, 
-no nose, no mouth, no blush. The face area is a smooth featureless 
-surface, exactly like a blank vinyl art toy. The bangs/hair cover 
-the forehead, and the lower face is an empty smooth surface.
-
-[完整外观描述：发型、发饰、服装、配饰、鞋履、配色]
-⚠️ 外观描述中绝对不要包含任何五官描述（眼睛、眉毛、鼻子、嘴巴、腮红）
-
-Smooth matte vinyl plastic material finish, soft diffuse lighting, 
-pure white background.
-
-CRITICAL: Maintain the exact doll body proportions — oversized head, 
-tiny body, stubby limbs, large round shoes. DO NOT change the body 
-structure. The face must remain BLANK with NO facial features.
+1. 读取当前版本 prompt_final.md
+2. 根据轮次选择策略，调用 image_gen
+3. 保存 output.png 到 step_5_iterations/r{N}/
+4. 保存本轮实际使用的 prompt 到 step_5_iterations/r{N}/prompt.md
+5. 将 output.png + 模板图 + 参考图 加载到主模型上下文
+6. 主模型内部视觉逐项判定检验清单
+7. 写入检验报告 step_5_iterations/r{N}/inspection_report.md
+8. 决策：全部通过 → 进入 Step 6；有失败 → 调整 prompt，进入下一轮
 ```
 
-**单参考图轮次（R3, R4, R5）**：
+### 视觉检验清单（每轮必做）
 
+将三张图（生成图、模板图、参考图）同时加载到主模型上下文，要求逐项判定：
+
+| # | 检查维度 | 检验内容 | 对比源 |
+|---|----------|----------|--------|
+| S1 | **Shape** | 头身比是否接近标准模特 | 模板图 |
+| S2 | **Shape** | 头部大小/形状是否一致 | 模板图 |
+| S3 | **Shape** | 四肢粗细/长度是否一致 | 模板图 |
+| S4 | **Shape** | 整体轮廓/剪影是否一致 | 模板图 |
+| S5 | **Shape** | 材质是否为哑光塑料质感 | 模板图 |
+| S6 | **Shape** | 面部是否完全留白（无五官） | 模板图 |
+| S7 | **Shape** | 是否存在额外肢体 | — |
+| P1 | **Pose** | 头部朝向/倾斜是否匹配 | 参考图 |
+| P2 | **Pose** | 手臂位置/姿态是否匹配 | 参考图 |
+| P3 | **Pose** | 腿部位置/重心是否匹配 | 参考图 |
+| P4 | **Pose** | 躯干旋转是否匹配 | 参考图 |
+| A1 | **Appearance** | 发型是否迁移（含塑料化） | 参考图 |
+| A2 | **Appearance** | 服装款式/颜色是否迁移 | 参考图 |
+| A3 | **Appearance** | 配饰/道具是否迁移 | 参考图 |
+| A4 | **Appearance** | 鞋履是否迁移 | 参考图 |
+| A5 | **Appearance** | 整体配色是否匹配 | 参考图 |
+
+每项判定为 ✅ 通过 / ❌ 失败 / ⚠️ 偏差（可接受）。
+
+### 迭代调整规则
+
+- **Shape 项（S1-S7）任一失败** → 优先级最高。在 prompt 中加重结构约束，单图轮次强化"DO NOT change body proportions"。
+- **Pose 项失败** → 调整姿势描述用语，使用空间化语言（"left side of head is higher than right"）替代角度数值。
+- **Appearance 项失败** → 补充细粒度描述（编号定位法处理装饰物数量）。
+- **5 轮耗尽仍未全部通过** → 停止生成，进入 Step 6 评分选出最优。
+
+### 关键 Prompt 技巧
+
+**防止发型被模板抑制**：
 ```
-This is a chibi vinyl art toy doll. The body structure, proportions, 
-head size, and limb thickness are EXACTLY as shown in the reference 
-image — DO NOT modify any proportions. The head-to-body ratio is locked.
-🔴 The face is BLANK — a smooth featureless surface with NO eyes, 
-NO eyebrows, NO nose, NO mouth, NO blush. Keep the face exactly as 
-blank as the reference image.
-
-🔴 The hair must be COMPLETELY replaced — the original short bob 
-hairstyle in the reference image must be entirely removed and 
-replaced with: [完整发型描述，包括刘海形态、鬓发延伸、马尾起始位置、卷度、长度、发饰].
-Explicitly describe side-swept bangs that extend past the cheeks 
-as framing strands, and pigtails starting from below ear level.
-
-Now recolor and retexture the surface only: [完整外观描述].
-⚠️ 外观描述中绝对不要包含任何五官描述（眼睛、眉毛、鼻子、嘴巴、腮红）
-
-The body stays EXACTLY the same size and shape — only colors and 
-surface details change. The face must remain completely BLANK.
-```
-
-#### 6.2 调用 image_gen
-
-```
-双参考图轮次：
-  - reference_images: [posed_doll_base.png, reference.png]
-  - prompt: 上述双图提示词
-
-单参考图轮次：
-  - reference_images: [posed_doll_base.png]
-  - prompt: 上述单图提示词
-```
-
-#### 6.3 保存输出
-
-每轮生成后**立即保存**到对应目录，**绝不覆盖**：
-
-```bash
-cp <生成图> stage_6_reconstruction/iterations/r{N}/output.png
+The hair is COMPLETELY different from the template's original
+hairstyle — replace it entirely with: [完整目标发型描述]
 ```
 
-#### 6.4 快速验证
-
-每轮生成后用 `vision_analyze` 快速检查 4 个核心项：
-
-| # | 检查项 | 对比源 |
-|---|--------|--------|
-| 1 | 头身比是否保持 ~2.2 | vs doll_base.png |
-| 2 | 头部倾斜/手臂位置是否正确 | vs reference.png |
-| 3 | 核心外观元素是否齐全 | vs reference.png |
-| 🔴 4 | 面部是否完全留白（无五官） | vs doll_base.png |
-
-#### 6.5 写入本轮报告
-
-每轮报告格式：
-
-```markdown
-# Stage 6 — 迭代 R{N}
-
-> 策略: [双参考图 / 单参考图]
-> 参考图: [列出]
-
-## 提示词
-[完整 prompt]
-
-## 快速验证
-| # | 检查项 | 结果 |
-|---|--------|------|
-| 1 | 头身比 | ✅/❌ |
-| 2 | 姿势 | ✅/❌ |
-| 3 | 外观 | ✅/❌ |
-
-## 本轮分析
-[失败原因 / 改进方向]
+**防止额外肢体**：
+```
+CRITICAL: The figure has EXACTLY TWO ARMS and EXACTLY TWO LEGS.
+No extra limbs. No third arm.
 ```
 
-#### 6.6 迭代决策
-
-- 如当前轮全部通过 → 可提前终止，直接进入 Stage 7
-- 如当前轮有失败 → 分析原因，调整 prompt，进入下一轮
-- 如 R5 完成仍未完美 → 停止生成，进入 Stage 7 打分排序
-
-### ⚠️ 关键陷阱
-
-1. **双参考图比例漂移**：双图模式下 reference.png 的比例会通过图像通道污染输出，
-   头身比可能从 2.2 漂移至 ~2.0。这是预期行为，R3 切换单图后会修复。
-
-2. **单参考图外观丢失**：单图模式下复杂视觉特征（如特定印花）可能丢失。
-   需要在文本 prompt 中极其详细地描述外观。
-
-3. **Q 版对称性偏好**：模型抗拒头部不对称。使用空间化语言
-   （"left side of head is lower"）而非角度数值。
-
-4. 🔴 **五官泄漏**：参考图中的人脸五官（眼睛、嘴巴、腮红）极易通过外观描述
-   泄漏到最终输出。必须在 prompt 中明确禁止五官，且外观描述中完全剔除
-   面部特征词汇。在快速验证中作为独立检查项。
-
-5. 🔴 **发型结构被模板抑制**：单参考图模式下，posed_doll_base 的原始发型
-   （波波头短发、圆润轮廓）会抑制目标发型的细节迁移。常见问题：
-   - 刘海被"截断"为模板的齐刘海长度，无法延伸为斜刘海+鬓发
-   - 侧边鬓发（framing strands）完全丢失
-   - 双马尾起始位置被模板的短发轮廓限制
-   
-   **对策**：在 prompt 中显式描述发型与模板的差异：
-   ```
-   "The hair is COMPLETELY different from the reference image's original 
-   short bob — replace it entirely: long side-swept bangs that extend 
-   past the cheeks as framing strands, and two long drill pigtails 
-   starting from below the ears."
-   ```
-   明确告诉模型"替换原有发型"而非"修改原有发型"。
-
-6. 🔴 **装饰元素数量偏差**：当 prompt 中仅描述数量（如"4 个蝴蝶结"），
-   模型可能生成错误数量（如 3 个）。在 bunny_chibi 项目中，R1 仅生成 3 个蝴蝶结。
-   
-   **对策**：对需要精确数量的装饰元素，使用编号+位置描述：
-   ```
-   "EXACTLY FOUR bows on hair: BOW 1 — large, at cheek level right side.
-   BOW 2 — medium, mid-length right side below BOW 1.
-   BOW 3 — medium, near end of right side below BOW 2.
-   BOW 4 — medium, near end of left side."
-   ```
-   编号+精确位置比单纯的数量描述更有效。R2 采用此策略后一次性通过。
-
-7. 🔴 **Stage 7 Shape 评分受外观干扰**：vision 模型在 Stage 7 验证时，
-   可能将长发体积、赤脚、头顶装饰物等外观变化误判为 Shape 层结构漂移，
-   导致 S1（头部大小）、S2（头身比）、S4（整体轮廓）被错误标记为失败。
-   
-   **对策**：当 Shape 得分异常低（<70）但 S3（四肢粗细）、S5（材质）、
-   S6（面部留白）均通过时，应人工复核确认是否为外观干扰而非真实结构漂移。
-   在验证报告中标注"可能为外观干扰"。
+**精确数量装饰物**：
+```
+EXACTLY FOUR bows: BOW 1 — large at cheek level right side.
+BOW 2 — medium below BOW 1. BOW 3 — medium near right end.
+BOW 4 — medium near left end.
+```
 
 ### 输出
-
 | 产物 | 路径 | 格式 |
 |------|------|------|
-| R1-R5 生成图 | `stage_6_reconstruction/iterations/r{N}/output.png` | PNG |
-| R1-R5 报告 | `stage_6_reconstruction/iterations/r{N}/report.md` | Markdown |
-| 迭代总览 | `stage_6_reconstruction/iterations/README.md` | Markdown |
+| R1-R5 生成图 | `step_5_iterations/r{N}/output.png` | PNG |
+| R1-R5 提示词 | `step_5_iterations/r{N}/prompt.md` | Markdown |
+| R1-R5 检验报告 | `step_5_iterations/r{N}/inspection_report.md` | Markdown |
+| 迭代总览 | `step_5_iterations/README.md` | Markdown |
 
-> ⚠️ Stage 6 不产生 `final_doll.png`。最终选择由 Stage 7 打分排名决定。
+---
 
-## Stage 7 — 质量验证与打分排序
+## Step 6 — 最终评比、打分与报告
 
-> Stage 7 对 Stage 6 产生的所有迭代作品（N 个 output.png，N ≤ 5）逐一打分排序。
-> 输出两份报告：`ranking.md`（排名）和 `verification_report.md`（详细验证）。
+### 目的
+对 Step 5 全部成品进行系统性视觉评比，量化打分，生成排名与报告。
 
 ### 输入
+| 项目 | 来源 |
+|------|------|
+| 全部迭代成品 | `step_5_iterations/r{N}/output.png`（N ≤ 5） |
+| 标准模特模板 | 模板图 |
+| 参考图 | `input/reference.png` |
 
-| 项目 | 来源 | 格式 |
-|------|------|------|
-| Stage 6 全部输出 | `stage_6_reconstruction/iterations/r{1..N}/output.png` | PNG |
-| 标准人偶底座 | `stage_3_base/doll_base.png` | PNG |
-| 已摆姿势的人偶底座 | `stage_4_posed/posed_doll_base.png` | PNG |
-| 参考角色图 | `input/reference_cleaned.png` | PNG/JPG |
+### 操作
 
-### 操作方式
+#### 6.1 逐轮深度视觉分析
 
-#### 7.1 逐轮验证
+将全部成品图（最多5张）+ 模板图 + 参考图 **同时加载到主模型上下文**，一次性跨图对比评分。
 
-对 Stage 6 的**每一轮**输出（R1-R5 中实际生成的轮次），使用 `vision_analyze` 逐项对比验证。
+**Shape 维度（权重 45%）**
+| 子项 | 权重 | 判定标准 |
+|------|------|----------|
+| 头身比 | 4 | 与模板图差异 ≤5% 满分，>15% 0 分 |
+| 头部大小 | 4 | 与模板图一致 |
+| 四肢粗细 | 3 | 与模板图一致 |
+| 整体轮廓 | 3 | 剪影匹配度 |
+| 材质表现 | 2 | 塑料质感 |
+| 面部留白 | 4 | 完全无五官（有则 0 分） |
+| 肢体正确性 | 3 | 无额外肢体 |
 
-**Shape 验证**（对比 doll_base.png）：
+**Pose 维度（权重 25%）**
+| 子项 | 权重 | 判定标准 |
+|------|------|----------|
+| 头部方向 | 4 | 与参考图匹配 |
+| 手臂位置 | 4 | 与参考图匹配 |
+| 躯干朝向 | 3 | 与参考图匹配 |
+| 腿部位置 | 2 | 与参考图匹配 |
 
-| # | 检查项 | 权重 | 方法 |
-|---|--------|------|------|
-| S1 | 头部大小一致 | 3 | vision 对比头部尺寸 |
-| S2 | 头身比一致 | 3 | vision 对比整体比例 |
-| S3 | 四肢粗细一致 | 2 | vision 对比肢体粗细 |
-| S4 | 整体轮廓一致 | 2 | vision 对比剪影 |
-| S5 | 材质为塑料质感 | 1 | vision 判断材质 |
-| 🔴 S6 | 面部完全留白（无五官） | 3 | vision 检查是否有眼睛/眉毛/鼻子/嘴巴/腮红 |
+**Appearance 维度（权重 30%）**
+| 子项 | 权重 | 判定标准 |
+|------|------|----------|
+| 发型迁移 | 4 | 样式 + 塑料化特征 |
+| 服装迁移 | 4 | 款式 + 颜色 |
+| 配饰迁移 | 3 | 数量 + 位置 |
+| 鞋履迁移 | 2 | 款式 + 颜色 |
+| 配色方案 | 3 | 整体协调度 |
 
-**Pose 验证**（对比 reference.png）：
-
-| # | 检查项 | 权重 | 方法 |
-|---|--------|------|------|
-| P1 | 手臂位置匹配 | 3 | vision 对比左右手臂 |
-| P2 | 头部方向匹配 | 3 | vision 对比头部朝向 |
-| P3 | 躯干朝向匹配 | 2 | vision 对比身体方向 |
-| P4 | 腿部位置匹配 | 1 | vision 对比左右腿 |
-
-**Appearance 验证**（对比 reference.png）：
-
-| # | 检查项 | 权重 | 方法 |
-|---|--------|------|------|
-| A1 | 发型已迁移 | 3 | vision 对比发型样式 |
-| A2 | 服装已迁移 | 3 | vision 对比服装款式和颜色 |
-| A3 | 配饰已迁移 | 2 | vision 对比配饰 |
-| A4 | 鞋履已迁移 | 1 | vision 对比鞋履 |
-| A5 | 色彩已迁移 | 2 | vision 对比整体配色 |
-
-#### 7.2 打分规则
-
-每项检查：
-- ✅ 通过 = 满分
-- ❌ 失败 = 0 分
-
-**加权总分公式**：
+#### 6.2 评分公式
 
 ```
-Shape 得分 = (S1×3 + S2×3 + S3×2 + S4×2 + S5×1 + S6×3) / 14 × 100
-Pose 得分  = (P1×3 + P2×3 + P3×2 + P4×1) / 9 × 100
-Appearance = (A1×3 + A2×3 + A3×2 + A4×1 + A5×2) / 11 × 100
+Shape_score   = Σ(Shape_pass × weight) / Σ(weight) × 100
+Pose_score    = Σ(Pose_pass × weight) / Σ(weight) × 100
+Appearance_score = Σ(App_pass × weight) / Σ(weight) × 100
 
-综合得分 = Shape×0.40 + Pose×0.30 + Appearance×0.30
+Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 ```
 
-**权重设计原理**：
-- Shape 权重最高（40%）：结构一致性是 DRE 的最高优先级
-- Pose 和 Appearance 各 30%：两者同等重要
-- 子项中头身比、头部方向、发型、服装权重最高（各 3 分）
+每项检查：✅ 通过 = 满分，❌ 失败 = 0 分，⚠️ 偏差 = 50% 权重分。
 
-#### 7.3 排名
+#### 6.3 排名规则
 
-1. 计算每轮的 Shape / Pose / Appearance / 综合得分
-2. 按综合得分降序排列
-3. 如最高分并列 → 优先选 Shape 得分更高者
-4. 如 Shape 也并列 → 优先选轮次更晚者（后期 prompt 更成熟）
+1. 按 `Composite` 降序排列
+2. 并列时：优先 `Shape_score` 更高者
+3. 仍并列：优先轮次更晚者
 
-#### 7.4 生成 ranking.md
-
-对全部迭代作品打分排序，输出排名表：
+#### 6.4 生成 ranking.md
 
 ```markdown
-# Stage 7 — 打分排名
-
-> 项目: {project_name}
-> 日期: {date}
-> 总轮次: {N}
-
-## 排名
-
-| 排名 | 轮次 | 策略 | Shape | Pose | Appearance | 综合 | 判定 |
-|------|------|------|-------|------|------------|------|------|
-| 1 | R2 | 单图 | 85.7 | 100 | 100 | 94.3 | 🥇 最优 |
-| 2 | R1 | 单图 | 78.6 | 100 | 90.9 | 88.7 | 🥈 |
-| 3 | R3 | 单图 | 71.4 | 88.9 | 81.8 | 79.6 | 🥉 |
-
-## 得分明细
-
-### R1
-| 维度 | 通过项 | 失败项 | 得分 |
-|------|--------|--------|------|
-| Shape | S3,S5,S6 | S1,S2,S4 | 42.9 |
-| Pose | P1,P2,P3,P4 | — | 100 |
-| Appearance | A1,A2,A3,A4,A5 | — | 100 |
-
-### R2
-...
+| 排名 | 轮次 | 策略 | Shape | Pose | Appearance | Composite | 推荐 |
+|------|------|------|-------|------|------------|-----------|------|
+| 1 | R3 | 单图 | 92.3 | 88.9 | 95.5 | 92.5 | 🥇 |
+| 2 | R1 | 双图 | 78.6 | 94.4 | 97.0 | 88.2 | 🥈 |
 ```
 
-#### 7.5 生成 verification_report.md
+#### 6.5 生成 evaluation_report.md
 
-对排名第一的作品，生成详细验证报告（格式同原 Stage 7 报告）。
-
-### 输出
-
-| 产物 | 路径 | 格式 |
-|------|------|------|
-| 打分排名 | `stage_7_verification/ranking.md` | Markdown |
-| 详细验证报告 | `stage_7_verification/verification_report.md` | Markdown |
-
-> ⚠️ Stage 7 不产生 `final_doll.png`。排名第一的 `output.png` 即为最终成品，
-> 用户可直接从 `stage_6_reconstruction/iterations/r{N}/output.png` 获取。
+包含：项目概况、逐轮详细评分、关键发现、偏差记录、结论与建议。
 
 ### 判定标准
 
-- **综合得分 ≥ 90** → 优秀
-- **综合得分 75-89** → 良好，可交付
-- **综合得分 60-74** → 一般，需人工审核
-- **综合得分 < 60** → 不合格，需重新执行 DRE 流程
-- **Shape 得分 < 70** → 无论综合得分如何，必须标记为结构风险
+| Composite | 判定 |
+|-----------|------|
+| ≥ 90 | 优秀，可直接交付 |
+| 75-89 | 良好，建议交付 |
+| 60-74 | 及格，需人工复核 |
+| < 60 | 不合格，建议重新执行 |
 
-### 偏差记录
+**硬性红线**：`Shape_score < 70` 或 `S6（面部留白）= 0` → 标记为"结构违规，不可交付"。
 
-对排名第一的输出，记录所有非满分的检查项：
+### 输出
+| 产物 | 路径 | 格式 |
+|------|------|------|
+| 排名表 | `step_6_final_evaluation/ranking.md` | Markdown |
+| 详细评估报告 | `step_6_final_evaluation/evaluation_report.md` | Markdown |
 
-| 偏差项 | 严重性 | 说明 |
-|--------|--------|------|
-| ... | 高/中/低 | ... |
+> 排名第一的 `step_5_iterations/r{X}/output.png` 即为最终成品。
 
-偏差分级：
-- **高**：Shape 项失败 → 结构风险
-- **中**：Pose 或关键 Appearance 项失败 → 可用但不完美
-- **低**：次要 Appearance 项失败 → 可接受
+---
+
+## 关键陷阱与对策
+
+| 陷阱 | 发生阶段 | 对策 |
+|------|----------|------|
+| 双图模式下参考图比例污染输出 | Step 5 R1-R2 | 结构描述前置 + 单图轮次兜底修复 |
+| 五官从参考图泄漏 | Step 5 | Step 2 强制清除 + 检验清单 S6 + 评分 0 分红线 |
+| 发型被模板原始发型抑制 | Step 5 | Prompt 中显式声明"COMPLETELY replace the hair" |
+| 装饰物数量偏差 | Step 5 | 编号 + 精确定位法写入 prompt |
+| 视觉模型将外观体积误判为结构漂移 | Step 5/6 | 检验时要求区分"外观层"与"结构层"；Shape 异常时人工复核 |
+| 额外肢体（多手/多脚） | Step 5 | Prompt 强制声明"EXACTLY two arms/legs" |
+| 发型镂空/尖锐发梢 | Step 5/6 | Step 2 已写入"solid vinyl-like masses, rounded blunt tips" |
+| Q版对称性偏好导致头部倾斜丢失 | Step 5 | 空间化语言替代角度数值 |
+
+---
 
 ## 工具依赖
 
-| 阶段 | 工具 | 用途 |
+| Step | 方式 | 用途 |
 |------|------|------|
-| Stage 0 | `vision_analyze` + `image_gen` | 图片预处理：识别杂物 + 清理生成 |
-| Stage 1 | `vision_analyze` | 参考图全面分析 |
-| Stage 2 | `vision_analyze` | 姿势确认 |
-| Stage 3 | `vision_analyze` | 模板结构确认 |
-| Stage 4 | `image_gen` | 图文生图（姿势应用） |
-| Stage 5 | `vision_analyze` + `image_gen` | 资产识别与生成 |
-| Stage 6 | `image_gen` | 图文生图（外观迁移） |
-| Stage 7 | `vision_analyze` | 逐项对比验证 |
+| 1 | 主模型内部视觉 | 参考图分析 |
+| 2 | 文本规则 + 主模型内部视觉 | 提示词增强 + 自动验证 |
+| 3 | 主模型内部视觉 | 模板结构分析 |
+| 4 | 文本处理 | 提示词融合 |
+| 5 | `image_gen` + 主模型内部视觉 | 生成 + 每轮检验 |
+| 6 | 主模型内部视觉 | 深度评比打分 |
+
+**完全移除 `vision_analyze` 调用。**
+
+---
+
+## API 资源预算
+
+| 步骤 | 消耗 | 说明 |
+|------|------|------|
+| Step 1 | 主模型 1 轮看图 | 零外部 API |
+| Step 2 | 主模型 1 轮看图 + 文本处理 | 零外部 API |
+| Step 3 | 主模型 1 轮看图 | 零外部 API |
+| Step 5（5轮） | 5× `image_gen` + 主模型 5 轮看图 | 唯一外部调用 |
+| Step 6 | 主模型 1 轮看多图 | 零外部 API |
+| **总计上限** | **5× `image_gen`** | 视觉分析全部内化 |
+
+---
 
 ## 使用方式
 
-### 标准流程（仅需参考图）
+### 标准流程
 
 用户提供参考角色图，说「跑 DRE 流程」或「重建这个人偶」即可。
 
-1. 用户提供参考图 → 保存为 `~/DRE_Projects/{project_name}/input/reference.png`
-2. **Stage 0 自动执行**：清理背景杂物、移除悬空元素、面部留白 → 产出 `reference_cleaned.png`
-3. 模板自动使用技能内置默认模板（`assets/default_template.png`）
-4. 按 Stage 0 → 1 → 2 → 3 → 4 → 6 → 7 顺序执行，Stage 5 在 Stage 1 完成后并行启动
+1. 保存参考图为 `~/DRE_Projects/{project_name}/input/reference.png`
+2. 自动执行 Step 1 → 2 → 3 → 4 → 5 → 6
+3. 模板自动使用内置默认模板
+4. 最终成品路径：`step_5_iterations/r{rank1}/output.png`
 
 ### 自定义模板（可选）
 
-如用户提供了自定义人偶模板，放置于 `input/template.png`，Stage 3 会优先使用。
+用户提供自定义模板，放置于 `input/template.png`，Step 3 优先使用。
+
+---
 
 ## 参考案例
 
-- `references/gothic-lolita-starry-night-case-study.md` — 完整执行案例，
-  包含 Stage 4 和 Stage 6 的迭代日志、关键陷阱和解决方案。
-- `references/bunny-chibi-case-study.md` — 第二个完整案例，
-  包含 Stage 0 面部留白预处理、双参考图超时回退、蝴蝶结编号策略、
-  Stage 7 Shape 外观干扰分析。
+- `references/gothic-lolita-starry-night-case-study.md` — v1.x 案例，包含头部倾斜迭代策略
+- `references/bunny-chibi-case-study.md` — v1.x 案例，包含面部留白预处理、蝴蝶结编号策略
+- `references/toddler-fish-case-study.md` — v1.x 案例，包含 Provider 回退链、Shape 外观干扰分析
+- `references/lolita-bonnet-girl-case-study.md` — v1.x 案例，包含多肢体缺陷修复
+
+---
 
 ## 版本管理
 
@@ -914,15 +708,6 @@ Appearance = (A1×3 + A2×3 + A3×2 + A4×1 + A5×2) / 11 × 100
 ```bash
 cd ~/.hermes/skills/doll-reconstruction/dre-workflow
 git add -A
-git commit -m "描述变更"
+git commit -m "v2.0: 6-step pipeline with internal vision and auto-validation"
 git push
-```
-
-### 迁移到新主机
-
-```bash
-# 在新主机上克隆
-mkdir -p ~/.hermes/skills/doll-reconstruction
-git clone git@github.com:ashesxera/hermes-dre-workflow.git \
-  ~/.hermes/skills/doll-reconstruction/dre-workflow
 ```
