@@ -1,12 +1,12 @@
 ---
 name: dre-workflow
-description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.0: 6-step pipeline with internal vision, auto-validation, and iterative generation."
-version: 2.0.0
+description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.1: fixed dual-reference strategy with R5-revised prompt template, material emphasis layer, and reference-driven symmetry/shoe style."
+version: 2.1.0
 platforms: [macos, linux]
 repository: https://github.com/ashesxera/hermes-dre-workflow
 ---
 
-# DRE 工作执行方案 v2.0
+# DRE 工作执行方案 v2.1
 
 > 基于 Doll Reconstruction Workflow 制定
 > 全局优先级：**Shape > Pose > Appearance**
@@ -14,7 +14,17 @@ repository: https://github.com/ashesxera/hermes-dre-workflow
 
 ---
 
-## 核心变更（v2.0）
+## 核心变更（v2.1）
+
+| 维度 | v2.0 | v2.1 |
+|------|------|------|
+| 参考图策略 | 默认双图，可单图回退 | **固定双图策略**，单图仅作为极端回退 |
+| 提示词模板 | 固定双图模板 | **R5 修订版正式模板**，显式加入材质强调层 |
+| 鞋型/对称性 | 模板说明中已放宽 | **彻底移除固定约束**，全部交由参考图决定 |
+
+---
+
+## 历史核心变更（v2.0）
 
 | 维度 | v1.x | v2.0 |
 |------|------|------|
@@ -390,10 +400,15 @@ Step 2 产出 `prompt_stage0_enhanced.md` 后，**立即触发自动验证**。
 
 ---
 
-## Step 4 — 提示词融合与优化
+## Step 4 — 提示词融合与备份
 
 ### 目的
-将 Step 2 的外观提示词与 Step 3 的标准模特结构参数融合，生成最终绘图提示词。
+将 Step 2 的外观提示词与 Step 3 的标准模特结构参数融合，生成完整版外观描述文档。
+
+**说明**：Step 5 固定使用双图极简提示词模板，不依赖本步输出的完整版提示词。本步输出仅作为：
+- 单图极端回退备用（双图调用失败时使用）
+- 完整外观描述备查清单
+- 供用户审阅的详细角色设定档案
 
 ### 输入
 | 项目 | 来源 |
@@ -430,7 +445,7 @@ and EXACTLY two legs. No extra limbs.
    - 如外观描述中意外包含比例词汇（如"slender body"），删除或替换为符合标准模特的描述（"tiny compact body"）。
    - 如外观描述中包含材质冲突（如"silky dress"），保留塑料质感描述，将"silky"降级为视觉纹理描述（"smooth plastic surface with embossed fabric texture"）。
    - 如外观描述中包含面部标记（创可贴、贴纸等），必须明确其**物理附着面**：皮肤上用 "on the skin surface" / "on the forehead" / "on the cheek" ；头发上用 "in the hair" 或 "attached to the hair"。禁止模糊的 "on the top of the head" 等不确定附着面的描述。
-   - 如提示词中同时存在"对称性约束"与"非对称姿势"（如头部倾斜、内八字），需判断哪个优先级更高。Shape 层的对称性约束为绝对权威，但 Pose 层的倾斜/内八字等微妙姿势可通过空间化描述（如"left side of head is slightly higher than right"）而非角度数值来实现，避免与对称约束直接冲突。如模型始终不执行倾斜，可降低"对称性"描述的强制度。
+   - 如提示词中同时存在"对称性约束"与"非对称姿势"（如头部倾斜、内八字），**Pose 层的姿态优先**。双图策略下对称性由参考图决定，不强制 100% 镜像对称。
 
 ### 输出
 | 产物 | 路径 | 格式 |
@@ -442,65 +457,61 @@ and EXACTLY two legs. No extra limbs.
 ## Step 5 — 多轮迭代生成与视觉检验（最多5轮）
 
 ### 目的
-利用 `image_gen` 的单/双图策略生成成品，每轮后主模型内部视觉检验，动态调整。
-
+利用 `image_gen` 的固定双图策略生成成品，每轮后主模型内部视觉检验，动态调整。
 ### 输入
+
 | 项目 | 来源 |
 |------|------|
-| 最终融合提示词 | `step_2_prompt_construction/prompt_final.md` |
+| 双图提示词模板 | Step 5 固定模板（上文定义） |
 | 标准模特模板 | `assets/default_template.png` 或 `input/template.png` |
-| 原始参考图 | `input/reference.png`（双图策略时使用） |
+| 原始参考图 | `input/reference.png` |
+| 完整版提示词（单图极端回退备用） | `step_2_prompt_construction/prompt_final.md` |
 
-### 单/双图策略
+### 图片策略（固定双图）
 
-| 轮次 | 策略 | 参考图 | 提示词类型 | 目的 |
-|------|------|--------|-----------|------|
-| R1 | **双图** | 模板图 + 参考图 | **极简提示词**（仅 Shape 硬约束 + 外观关键词） | 由参考图直接传递外观信息，测试融合能力 |
-| R2 | **双图** | 模板图 + 参考图 | **极简提示词** | 基于 R1 检验修复缺陷 |
-| R3 | **单图** | 模板图 | **完整提示词**（`prompt_final.md`） | 锁定结构，纯文本精修外观细节 |
-| R4 | **单图** | 模板图 | **完整提示词** | 精修外观细节 |
-| R5 | **单图** | 模板图 | **完整提示词** | 最终精修或兜底 |
+**固定策略：每轮必须使用双图**（模板图 + 参考图）。双参考图策略是 DRE 生产轨道的默认且唯一标准策略；参考图承担外观信息传递，提示词仅锁定 Shape 约束和材质气质。
 
-**双图策略提示词规范（R1-R2）**：
-
-双图时提示词必须**降级为极简版**，外观细节由参考图直接承担。禁止直接传入完整版 `prompt_final.md`。
+**固定双图提示词模板**（v2.1 — 基于 R5 修订版）：
 
 ```
-[Shape 硬约束 — 高权重锚点]
 A chibi vinyl art toy figure with extreme deformed proportions:
 head ~56% of total height, tiny compact body, short stubby limbs,
-large round-toe shoes, 100% mirror-symmetric silhouette.
-The body structure is LOCKED and must NOT be altered.
+large shoes. The body structure is LOCKED and must NOT be altered.
 
-[极简外观指令 — 仅列关键词]
 Reference the attached character image for:
 - hairstyle, hair accessories, hair color
 - clothing style, colors, layering, patterns
 - shoes, scarf, props, accessories
-- pose, stance, head tilt, foot angle
+- pose, stance, head tilt, foot angle, symmetry/asymmetry
 - face decorations (band-aid location, stickers)
 
-[硬约束收尾]
-Smooth matte vinyl plastic material, soft diffuse lighting,
+The entire figure must have a smooth, glossy plastic texture — no fabric, no fuzz, no matte softness. Everything is solid molded vinyl with sharp highlights and smooth rounded surfaces.
+
+Smooth glossy vinyl plastic material, soft diffuse lighting,
 3D render style, pure white background.
+
 CRITICAL: The face remains completely blank with NO eyes,
 NO eyebrows, NO nose, NO mouth, NO blush.
 EXACTLY two arms and EXACTLY two legs. No extra limbs.
 ```
 
-**单图策略提示词规范（R3-R5）**：
+**模板说明**：
+- `large shoes` — 鞋子样式由参考图决定，不固定约束圆头鞋；对称性/非对称性也由参考图姿态决定，不强制 100% 镜像对称
+- `smooth, glossy plastic texture — no fabric, no fuzz, no matte softness` — 材质强调为强制项，防止参考图的布料/柔绒质感覆盖模板的塑料感
+- 外观信息（发型、服装、配饰、颜色、姿势）完全由参考图承担，提示词仅保留 Shape 锁定 + 材质强制 + 面部留白约束
 
-使用 `prompt_final.md` 完整版，由纯文本传递全部外观细节。
+**模板修订记录（R5 → 正式版）**：
+- 移除 "100% mirror-symmetric silhouette" → 对称性由参考图决定
+- 移除 "round-toe enclosed shoes" 约束 → 鞋型由参考图决定
+- 显式加入 `"smooth, glossy plastic texture — no fabric, no fuzz, no matte softness"` 材质强调，作为防止参考图质感覆盖的强制层
 
-**超时回退**：任何轮次如 `image_gen` 超时 → 自动切换为单图模式继续。
+**单图回退（仅极端例外）**：仅在 `image_gen` 双图调用超时或参考图无法加载等极端情况下，才回退至单图模式。回退时启用 `step_2_prompt_construction/prompt_final.md` 完整版提示词。
 
 ### 每轮操作流程
 
 ```
-1. 根据轮次选择策略：
-   - 双图轮次（R1-R2）：使用极简提示词，不传入完整版 prompt_final.md
-   - 单图轮次（R3-R5）：使用完整版 prompt_final.md
-2. 调用 image_gen
+1. 使用固定双图提示词模板（上文定义），不传入完整版 prompt_final.md
+2. 调用 image_gen（模板图 + 参考图）
 3. 保存 output.png 到 step_5_iterations/r{N}/
 4. 保存本轮实际使用的 prompt 到 step_5_iterations/r{N}/prompt.md
 5. 将 output.png + 模板图 + 参考图 加载到主模型上下文
@@ -538,6 +549,7 @@ EXACTLY two arms and EXACTLY two legs. No extra limbs.
 > 核心原则：DRE 不是复刻参考图，而是将参考图的角色身份翻译成 vinyl toy 形态。
 > 参考图可能是 9 头身手绘美少女、写实照片、2D 插画或棉花娃娃实物——这都不重要。
 > 重要的是成品必须具备 vinyl toy 气质，且角色身份一眼可识。
+> 用户原话："参考图是手绘9头身修长美少女风格，但我要的成品是1.8头身大头小身体超级Q版塑料娃娃手办风格。"
 
 ---
 
@@ -646,8 +658,8 @@ EXACTLY two arms and EXACTLY two legs. No extra limbs.
 
 ### 迭代调整规则
 
-- **第一层任一项失败** → 优先级最高。检查是否提示词中 Shape 约束被弱化或覆盖，单图轮次加强"body structure LOCKED"。
-- **第二层失败** → 检查参考图是否被正确传递。双图轮次确保参考图清晰可见；单图轮次检查提示词中的角色识别元素是否齐全。
+- **第一层任一项失败** → 优先级最高。检查是否提示词中 Shape 约束被弱化或覆盖，加强 `"body structure LOCKED"` 重申。
+- **第二层失败** → 检查参考图是否被正确传递。确保参考图清晰可见、关键元素无遮挡；如必须回退单图，检查完整版提示词中的角色识别元素是否齐全。
 - **第三层核心特征缺失** → 在提示词中明确标注该元素为"核心识别特征，不可遗漏"。
 - **某轮三层全部通过** → 可提前终止迭代，跳过剩余轮次直接进入 Step 6。
 - **5 轮耗尽未全部通过** → 停止生成，进入 Step 6 评出最优。
@@ -796,7 +808,8 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 
 | 陷阱 | 发生阶段 | 对策 |
 |------|----------|------|
-| 双图模式下参考图比例污染输出 | Step 5 R1-R2 | 结构描述前置 + 单图轮次兜底修复 |
+| 双图模式下参考图比例污染输出 | Step 5 R1-R2 | 双图极简提示词中加强 Shape 结构前置描述，确保模板结构不被覆盖 |
+| **双图策略材质偏移**：参考图的布料/柔绒质感覆盖模板的塑料感 | Step 5 | 双图极简提示词中必须显式加入 `"smooth, glossy plastic texture — no fabric, no fuzz, no matte softness"` 材质强调 |
 | 五官从参考图泄漏 | Step 5 | Step 2 强制清除 + 检验清单 S6 + 评分 0 分红线 |
 | 发型被模板原始发型抑制 | Step 5 | Prompt 中显式声明"COMPLETELY replace the hair" |
 | 装饰物数量偏差 | Step 5 | 编号 + 精确定位法写入 prompt |
@@ -896,6 +909,6 @@ Hermes 插件为**进程级缓存**：
 ```bash
 cd ~/.hermes/skills/doll-reconstruction/dre-workflow
 git add -A
-git commit -m "v2.0: 6-step pipeline with internal vision and auto-validation"
+git commit -m "v2.1: fixed dual-reference strategy, R5-revised prompt template with material emphasis, reference-driven symmetry/shoe style"
 git push
 ```
