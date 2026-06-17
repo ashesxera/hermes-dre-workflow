@@ -487,6 +487,9 @@ Reference the attached character image for:
 
 The entire figure must have a smooth, glossy plastic texture — no fabric, no fuzz, no matte softness. Everything is solid molded vinyl with sharp highlights and smooth rounded surfaces.
 
+Pure white background, no background objects, no floating props,
+no decorative elements suspended in the air, no text, no watermarks.
+
 Smooth glossy vinyl plastic material, soft diffuse lighting,
 3D render style, pure white background.
 
@@ -498,12 +501,13 @@ EXACTLY two arms and EXACTLY two legs. No extra limbs.
 **模板说明**：
 - `large shoes` — 鞋子样式由参考图决定，不固定约束圆头鞋；对称性/非对称性也由参考图姿态决定，不强制 100% 镜像对称
 - `smooth, glossy plastic texture — no fabric, no fuzz, no matte softness` — 材质强调为强制项，防止参考图的布料/柔绒质感覆盖模板的塑料感
-- 外观信息（发型、服装、配饰、颜色、姿势）完全由参考图承担，提示词仅保留 Shape 锁定 + 材质强制 + 面部留白约束
+- 外观信息（发型、服装、配饰、颜色、姿势）完全由参考图承担，提示词仅保留 Shape 锁定 + 材质强制 + 背景清除 + 面部留白约束
 
 **模板修订记录（R5 → 正式版）**：
 - 移除 "100% mirror-symmetric silhouette" → 对称性由参考图决定
 - 移除 "round-toe enclosed shoes" 约束 → 鞋型由参考图决定
 - 显式加入 `"smooth, glossy plastic texture — no fabric, no fuzz, no matte softness"` 材质强调，作为防止参考图质感覆盖的强制层
+- 显式加入背景清除层 `"Pure white background, no background objects, no floating props, no decorative elements suspended in the air, no text, no watermarks"`，确保背景纯白无杂物
 
 **单图回退（仅极端例外）**：仅在 `image_gen` 双图调用超时或参考图无法加载等极端情况下，才回退至单图模式。回退时启用 `step_2_prompt_construction/prompt_final.md` 完整版提示词。
 

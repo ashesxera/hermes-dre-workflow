@@ -153,7 +153,58 @@ EXACTLY two arms and EXACTLY two legs. No extra limbs.
 
 **Fix**: Step 6 must reload all images and perform fresh visual comparison. The instruction must explicitly state: "Scoring must be based on real-time visual comparison. Do NOT rely on previous round inspection report texts."
 
+### 4. R5 — Dual-Reference with Material Emphasis (v2.1 Template Origin)
+
+**Context**: R1-R4 iterated on band-aid placement and facial mark attachment. By R4, skin attachment was achieved using single-reference strategy. R5 tested whether dual-reference could work **with a minimal prompt + explicit material emphasis layer**.
+
+**R5 Original (pre-revision)**:
+```
+...100% mirror-symmetric silhouette...
+...round-toe enclosed shoes...
+Smooth matte vinyl plastic material...
+```
+
+**Problems observed**:
+- Material was "matte" instead of "glossy" — reference image's soft cotton texture overrode the plastic constraint
+- Shoes were forced to round-toe, overriding reference image's sneaker style
+- Symmetry was forced to 100% mirror, overriding reference image's natural asymmetry (uneven bangs)
+
+**R5 Revised (v2.1 official template)**:
+```
+...large shoes... [removed round-toe constraint]
+...symmetry/asymmetry... [removed 100% mirror constraint]
+The entire figure must have a smooth, glossy plastic texture
+— no fabric, no fuzz, no matte softness.
+Everything is solid molded vinyl with sharp highlights
+and smooth rounded surfaces.
+```
+
+**Results of revision**:
+- ✅ Material shifted from matte/cotton to **glossy PVC with sharp highlights**
+- ✅ Shoes became **reference-matching sneakers** with laces
+- ✅ Symmetry became **reference-driven** (uneven bangs preserved)
+- ✅ Band-aid remained correctly on forehead skin
+
+**Key lesson**: In dual-reference strategy, the reference image carries appearance information so strongly that any fixed constraint in the prompt (shoe type, symmetry level) will either be overridden or cause conflict. The prompt should only lock **Shape** (proportions, limb count, face blankness) and **material class** (plastic vs. fabric), leaving all stylistic details to the reference image.
+
+**v2.1 skill upgrade driven by this R5 revision**:
+- Dual-reference strategy promoted from "default" to **"fixed strategy"** — single-reference is now an extreme fallback only
+- R5 revised template became the **official fixed dual-reference prompt template**
+- `prompt_final.md` downgraded from "default iteration input" to **"extreme fallback only"**
+
+---
+
+## v2.1 Changelog Summary
+
+| Change | From | To |
+|--------|------|-----|
+| Image strategy | Default dual, single fallback | **Fixed dual**; single only on timeout/load failure |
+| Prompt template | Original dual minimal | **R5 revised** with explicit `smooth, glossy plastic — no fabric, no fuzz` |
+| Shoe style | Fixed "round-toe enclosed" | **Reference-driven**, no fixed constraint |
+| Symmetry | Fixed "100% mirror-symmetric" | **Reference-driven**, no fixed constraint |
+| Step 4 `prompt_final.md` | Default iteration input | **Extreme fallback only** |
+
 ## Files
-- `~/DRE_Projects/bunny_buns_girl/step_5_iterations/r{1..4}/output.png` — iteration outputs
-- `~/DRE_Projects/bunny_buns_girl/step_5_iterations/r{1..4}/prompt.md` — prompt evolution
-- `~/DRE_Projects/bunny_buns_girl/step_5_iterations/r{1..4}/inspection_report.md` — inspection records
+- `~/DRE_Projects/bunny_buns_girl/step_5_iterations/r{1..5}/output.png` — iteration outputs
+- `~/DRE_Projects/bunny_buns_girl/step_5_iterations/r{1..5}/prompt.md` — prompt evolution
+- `~/DRE_Projects/bunny_buns_girl/step_5_iterations/r{1..5}/inspection_report.md` — inspection records
