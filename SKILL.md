@@ -1,7 +1,7 @@
 ---
 name: dre-workflow
-description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.4: dual browser_vision per round (Shape vs template, Pose+Appearance vs reference), 2-image side-by-side for sharper detail."
-version: 2.4.0
+description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.5: strategy split (text-only vs dual-image) by provider capability, references/strategy-*.md."
+version: 2.5.0
 platforms: [macos, linux]
 repository: https://github.com/ashesxera/hermes-dre-workflow
 ---
@@ -18,9 +18,23 @@ repository: https://github.com/ashesxera/hermes-dre-workflow
 
 | 维度 | v2.3 | v2.4 |
 |------|------|------|
-| 视觉检验 | 主模型内部视觉 / vision_analyze 回退 | **browser_vision 多图并排**（统一方案） |
+| 视觉检验 | 主模型内部视觉 / vision_analyze 回退 | **browser_vision 双图并排**（统一方案） |
 | 跨图对比 | 文字描述→文字描述（间接） | **像素级并排对比**（直接） |
 | 工具依赖 | 依赖主模型多模态能力 | **所有模型通用** |
+| 生图策略 | 单一固定模板 | **策略文档分离**：纯文本 / 双图 各自建档 |
+| 提示词 | 引用不存在的 Image 编号 | **自包含描述**，去掉 Image 锚点 |
+| 动态调整 | 手动判断 | **规则化**：根据检验失败项精确调整对应段 |
+
+### 策略选择规则
+
+生图前检查当前 `image_gen` provider 的能力：
+
+| Provider | 能力 | 策略 | 文档 |
+|----------|------|------|------|
+| `gpt-image-2` (openapitoken) | text-only | **纯文本** | `references/strategy-text-only.md` |
+| `meshy` (nano-banana) | text + image | **双图** | `references/strategy-dual-image.md` |
+
+> 判断方式：`skill_view(name="dre-workflow", file_path="references/provider-openapitoken.md")` 或检查插件 `capabilities().get("modalities")`。
 
 ### v2.3
 
@@ -221,79 +235,29 @@ Appearance（参考图权威）：
 | 标准模特模板 | `assets/default_template.png` 或 `input/template.png` |
 | 原始参考图 | `input/reference.png` |
 
-### 图片策略（固定双图）
+### 图片策略
 
-**固定策略：每轮必须使用双图**（模板图 + 参考图）。双参考图策略是 DRE 生产轨道的唯一标准策略；参考图承担外观信息传递，提示词仅锁定 Shape 约束和材质气质。
+**根据当前 `image_gen` provider 自动选择生图策略**：
 
-**固定双图提示词模板**（v2.3 — 基于 gpt-image-2 最佳实践重构）：
+| Provider | 能力 | 策略 | 文档 |
+|----------|------|------|------|
+| `gpt-image-2` (openapitoken) | text-only | **纯文本** | `references/strategy-text-only.md` |
+| `meshy` (nano-banana) | text + image | **双图** | `references/strategy-dual-image.md`（待建） |
 
-> 模板遵循 wiki [[entities/gpt-image-2]] 的多图编辑规范：
-> Job 头 + Image 编号角色 + Preserve/Change/Do NOT add 三段式 + Constraints 收尾。
-> 三段式标签（`Preserve list` / `Change only` / `Do NOT add`）为 gpt-image-2 验证过的固定英文锚点，
-> 中文 prompt 中也保留这三个英文词。
+> 判断方式：检查插件 `capabilities().get("modalities")`。`["text"]` → 纯文本策略，`["text", "image"]` → 双图策略。
 
-```
-Job: Vinyl art toy figure — transfer character identity from reference
-     image onto a locked body template, producing a collectible designer
-     toy in 3D render style.
+**纯文本策略要点**（详见 `references/strategy-text-only.md`）：
+- 提示词自包含，不引用 Image 编号（模型看不到图，编号是噪音）
+- SHAPE RULES 段固定不变，每轮直接复制
+- APPEARANCE 段逐项精确描述（颜色+款式+位置+数量）
+- POSE 段用道具位置做空间锚点（避免 left/right 镜像反转）
+- DO NOT CHANGE 段逐项锁定不变元素（防颜色扩散）
+- 后续轮次只修改失败项对应段，其余逐字复制
 
-Image 1 (template): Body structure authority — a 1.8-head chibi vinyl
-     toy base with blank face, stubby limbs, and glossy plastic finish.
-     This image defines the SHAPE only. Its proportions, head size,
-     limb thickness, and body silhouette are LOCKED and must NOT change.
-
-Image 2 (reference): Character identity source — provides hairstyle,
-     hair accessories, hair color, clothing style/colors/layering,
-     shoes, props, accessories, pose, stance, head tilt, foot angle,
-     and symmetry/asymmetry. This image defines APPEARANCE and POSE only.
-
-Preserve list:
-- Image 1's body proportions exactly (head ~56% of total height,
-  tiny compact body, short stubby limbs, large shoes)
-- Image 1's blank face — completely smooth egg-shaped surface with
-  NO eyes, NO eyebrows, NO nose, NO mouth, NO blush
-- Image 1's glossy plastic material — smooth, solid molded vinyl
-  with sharp highlights and rounded surfaces
-- Image 1's limb count — EXACTLY two arms and EXACTLY two legs
-- Pure white background with no objects, no floating props,
-  no decorative elements suspended in the air
-
-Change only:
-- Replace Image 1's hairstyle with Image 2's hairstyle, hair
-  accessories, and hair color (solid vinyl-like masses, rounded
-  blunt tips, no wispy strands)
-- Replace Image 1's clothing with Image 2's clothing style,
-  colors, layering, and patterns (all rendered as glossy plastic)
-- Replace Image 1's shoes with Image 2's shoe style and color
-- Transfer Image 2's props and accessories
-- Transfer Image 2's pose: stance, head tilt, arm positions,
-  foot angle, symmetry or asymmetry
-
-Do NOT add:
-- Facial features of any kind (eyes, eyebrows, nose, mouth, blush)
-- Extra limbs beyond two arms and two legs
-- Fabric texture, fuzz, matte softness, or any non-plastic material
-- Background objects, floating props, text, watermarks, logos
-- Any elements not present in either Image 1 or Image 2
-
-Constraints:
-- Image numbering matches input order (Image 1 = template, Image 2 = reference)
-- Face remains completely blank — this is the highest priority constraint
-- NO watermark, NO extra text, NO duplicate or fake logo
-- Smooth glossy vinyl plastic material, soft diffuse lighting,
-  3D render style, pure white background
-```
-
-**模板说明**：
-- 遵循 gpt-image-2 多图编辑的**完整生产模板**格式（Job + Image 角色 + 三段式 + Constraints）
-- `Preserve list` 锁定 Shape 层所有硬约束（比例、面部留白、材质、肢体数、背景）
-- `Change only` 明确允许替换的范围（发型、服装、鞋、道具、姿态），防止模型自行扩散变更
-- `Do NOT add` 用否定句明确禁止项——gpt-image-2 对 `NO` 前缀的识别度高于模糊描述
-- 外观信息（发型、服装、配饰、颜色、姿势）完全由参考图承担，提示词仅锁定 Shape + 材质 + 背景 + 面部留白
-- 鞋子样式、对称性/非对称性由参考图决定，不固定约束
-- 材质强调为强制项（`Preserve list` 第三条），防止参考图的布料/柔绒质感覆盖模板的塑料感
-
-**单图回退（仅极端例外）**：仅在 `image_gen` 双图调用超时或参考图无法加载等极端情况下回退。回退时需在 prompt 中补全外观描述。
+**双图策略要点**（待建）：
+- 模板图 + 参考图同时传入
+- 提示词用 Image 编号标注角色分工
+- Preserve/Change/Do NOT add 三段式
 
 ### 每轮操作流程
 
@@ -735,6 +699,8 @@ Hermes 插件为**进程级缓存**：
 
 ## 参考案例
 
+- `references/strategy-text-only.md` — v2.5 纯文本生图策略（gpt-image-2 / openapitoken），自包含提示词模板，颜色扩散陷阱
+- `references/strategy-dual-image.md` — v2.5 双图生图策略（meshy nano-banana），极简提示词，Image 编号锚点
 - `references/v2.2-simplification-rationale.md` — v2.2 简化原理：为什么从 6-step 简化为 2-step，为什么移除 Step 1-4 的中间文件，以及 R5 迭代驱动的模板进化证据
 - `references/gothic-lolita-starry-night-case-study.md` — v1.x 案例，头部倾斜迭代策略
 - `references/bunny-chibi-case-study.md` — v1.x 案例，面部留白预处理、蝴蝶结编号策略
