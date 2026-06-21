@@ -334,17 +334,45 @@ python3 scripts/step0_preprocess.py \
 ### 每轮操作流程
 
 ```
-1. 使用固定双图提示词模板
+1. 构建本轮 prompt（按策略文档）
 2. 调用 image_gen（模板图 + 参考图）
 3. 保存 output.png 到 r{N}/
 4. 保存本轮实际使用的 prompt 到 r{N}/prompt.md
 5. 写 HTML 文件（2×1 grid：生成图 + 模板图），browser_navigate → browser_vision
-   → 检验 Shape 层（比例、材质、轮廓、面部留白、肢体）
-6. 写 HTML 文件（2×1 grid：生成图 + 参考图），browser_navigate → browser_vision
-   → 检验 Pose + Appearance 层（姿势、发型、服装、配饰、道具）
-7. 写入检验报告 r{N}/inspection.md
-8. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
+   → 检验 Shape 层，拿到结果文本
+6. 将检验结果写入同一 HTML 文件（图片下方），browser_navigate 打开
+   → 预览窗口同时看到对比图 + Shape 检验报告
+7. 写 HTML 文件（2×1 grid：生成图 + 参考图），browser_navigate → browser_vision
+   → 检验 Pose + Appearance 层，拿到结果文本
+8. 将检验结果写入同一 HTML 文件（图片下方），browser_navigate 打开
+   → 预览窗口同时看到对比图 + Pose/Appearance 检验报告
+9. 合并两次检验结果，写入 r{N}/inspection.md 归档
+10. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
 ```
+
+**HTML 格式规范**：
+
+```html
+<!DOCTYPE html>
+<html><head><style>
+  body { background: #222; color: #ddd; font-family: monospace; padding: 20px; }
+  .compare { display: flex; gap: 10px; margin-bottom: 20px; }
+  .compare img { max-height: 400px; max-width: 48%; object-fit: contain; }
+  .report { background: #1a1a2e; padding: 16px; border-radius: 8px;
+            white-space: pre-wrap; line-height: 1.5; max-width: 900px; }
+  .pass { color: #4ade80; } .fail { color: #f87171; } .warn { color: #fbbf24; }
+</style></head><body>
+  <div class="compare">
+    <img src="file:///.../r{N}/output.png">
+    <img src="file:///.../template.png">
+  </div>
+  <div class="report">
+<!-- browser_vision 结果插入此处 -->
+  </div>
+</body></html>
+```
+
+> `browser_vision` 返回文本后，替换 `<!-- browser_vision 结果插入此处 -->` 为实际报告内容，重新 `browser_navigate` 即可在预览窗口查看。
 
 **强制存档检查（每轮必做）**：
 - 如果未能成功写入 `prompt.md` 或 `inspection.md`，立即补写。

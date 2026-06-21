@@ -1,61 +1,53 @@
-# Color Diffusion Pitfall — gpt-image-2
+# Color Diffusion Pitfall (gpt-image-2)
 
-> Discovered 2026-06-21 during DRE lolita_bonnet_girl R4 generation.
-> Provider: openapitoken gpt-image-2 (text-only).
+> Discovered 2026-06-21 during DRE R4 generation.
+> Changing a single color word in the prompt caused gpt-image-2 to
+> reinterpret the entire design as a new color theme.
 
-## The Bug
+## The Incident
 
-Prompt changed ONLY the dress color from `soft peach` to `LIGHT BLUE`.
-All other text was identical to R3.
+R3 prompt: `soft peach Lolita maid dress` → correct result (peach dress, white accessories)
 
-## What Happened
+R4 prompt: changed ONLY `soft peach` → `LIGHT BLUE` in the dress description.
+Everything else in the prompt was identical.
 
-gpt-image-2 interpreted "LIGHT BLUE dress" as "make a blue-themed version"
-and changed 10+ elements beyond the dress:
+## What Actually Happened
 
-| Element | R3 (expected) | R4 (actual) | Correct? |
-|---------|--------------|-------------|----------|
-| Dress color | peach | light blue | ✅ |
-| Braid-end bows | WHITE | light blue | ❌ |
-| Star hairpins | 3 WHITE on forehead | 1 blue+white on side | ❌ |
-| Head bows | pink+white | all white | ❌ |
-| Bonnet | white lace | white+blue lining | ❌ |
-| Heart pillow | PINK | light blue+added bow | ❌ |
-| Apron | plain white | white+added blue bow | ❌ |
-| Socks | white over-knee lace | white ankle ribbed | ❌ |
-| Shoes | plain cream Mary Jane | cream Mary Jane+added bow | ❌ |
-| Material | PVC matte | porcelain/ceramic glaze | ❌ |
-| Teddy bears | correct | correct | ✅ |
-| Left hand pose | correct | correct | ✅ |
+| Element | R3 (peach) | R4 (light blue) | Expected? |
+|---------|-----------|-----------------|-----------|
+| Dress color | Peach ✅ | Light blue ✅ | ✅ Yes |
+| Braid-end bows | White | **Light blue** | ❌ Should stay white |
+| Star hairpins | 3 white, forehead row | **1 blue+white, right side** | ❌ Count, position, color all changed |
+| Head bows | Pink+white | **All white** | ❌ Pink lost |
+| Bonnet | White lace | White lace + **blue lining** | ❌ Added blue |
+| Heart pillow | Pink | Light blue + **added blue bow** | ❌ Color + extra decoration |
+| Apron | White plain | White + **added blue bow** | ❌ Extra decoration |
+| Socks | White over-knee lace | **Ankle-length ribbed** | ❌ Style completely changed |
+| Shoes | Cream Mary Jane | Mary Jane + **added bow** | ❌ Extra decoration |
+| Material | PVC matte | **Porcelain glaze** | ❌ Material changed |
 
 ## Root Cause
 
-gpt-image-2 has extremely strong **color semantic diffusion**. A single
-color word in one element's description is interpreted as a global theme
-directive. The model doesn't understand "change ONLY the dress color" —
-it understands "the user wants a blue version."
+gpt-image-2 interprets color words as **theme directives**, not isolated
+property changes. `LIGHT BLUE dress` is read as "make a blue-themed version"
+rather than "change only the dress color to blue."
 
-## Fix
+## Fix: DO NOT CHANGE Section
 
-Use the `DO NOT CHANGE` section to explicitly lock every element that
-should stay the same. Be specific about colors, counts, styles, and materials:
+The solution is to explicitly lock every element that should NOT change:
 
 ```
 DO NOT CHANGE:
 - Hair bow color (must stay WHITE)
-- Star hairpin color and count (must stay WHITE, exactly THREE)
-- Bonnet color (WHITE lace, no colored lining)
-- Heart pillow color (must stay PINK)
-- Apron color and style (WHITE, heart-shaped hem, no added decorations)
-- Sock style and length (WHITE over-knee with lace trim)
-- Shoe style and color (cream Mary Jane, no added bow)
-- Teddy bear colors and bowtie colors
-- Material (glossy vinyl plastic — NOT porcelain/ceramic)
+- Star hairpin color and count (must stay WHITE, exactly THREE, on forehead)
+- Head bow colors (must stay PINK and WHITE)
+- Bonnet (must stay WHITE lace, no colored lining)
+- Heart pillow color (must stay PINK, no added decorations)
+- Apron (must stay WHITE, no added bows)
+- Sock style and length (must stay WHITE over-knee with lace trim)
+- Shoe style and color (must stay cream Mary Jane, no added bows)
+- Material (must stay glossy vinyl plastic, NOT porcelain)
 ```
 
-## Prevention
-
-When changing ANY single element in a follow-up round:
-1. List the change in `CHANGE ONLY`
-2. List EVERY other element in `DO NOT CHANGE` with explicit color/style/material
-3. Never assume the model will keep unchanged elements stable
+This is now encoded in `references/strategy-text-only.md` as a mandatory
+section in every prompt.
