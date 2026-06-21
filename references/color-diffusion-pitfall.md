@@ -1,62 +1,61 @@
-# gpt-image-2 颜色词语义扩散陷阱
+# Color Diffusion Pitfall — gpt-image-2
 
-> 来源：DRE 工作流 R4 轮（lolita_bonnet_girl 项目，2026-06-21）
-> 后端：openapitoken.com gpt-image-2（generations 端点，text-only）
+> Discovered 2026-06-21 during DRE lolita_bonnet_girl R4 generation.
+> Provider: openapitoken gpt-image-2 (text-only).
 
-## 现象
+## The Bug
 
-R3 提示词中裙子颜色为 `soft peach`，R4 仅将 `soft peach` 改为 `LIGHT BLUE`，其余完全不变。
+Prompt changed ONLY the dress color from `soft peach` to `LIGHT BLUE`.
+All other text was identical to R3.
 
-预期：只有裙子颜色从桃色变为浅蓝。
+## What Happened
 
-实际：gpt-image-2 将 "LIGHT BLUE" 理解为"做一个蓝色主题版本"，导致：
+gpt-image-2 interpreted "LIGHT BLUE dress" as "make a blue-themed version"
+and changed 10+ elements beyond the dress:
 
-| 元素 | R3（桃色） | R4（浅蓝） | 是否预期 |
-|------|-----------|-----------|---------|
-| 裙色 | 桃粉 | 浅蓝 | ✅ |
-| 辫尾蝴蝶结 | 白色 | 浅蓝 | ❌ 被蓝色污染 |
-| 星形发夹 | 额前 3 颗一排 | 右侧 2 颗（一蓝一白） | ❌ 数量+位置+颜色全变 |
-| 大蝴蝶结 | 粉+白 | 全白 | ❌ 粉色丢失 |
-| Bonnet | 纯白镂空 | 白镂空+蓝色衬底透出 | ❌ 多了蓝色 |
-| 心形抱枕 | 粉色 | 浅蓝+新增蓝色蝴蝶结 | ❌ 颜色变+多了装饰 |
-| 围裙 | 白色素面 | 白色+新增蓝色小蝴蝶结 | ❌ 多了装饰 |
-| 袜子 | 过膝荷叶边袜 | 及踝罗纹短袜 | ❌ 款式全变 |
-| 鞋子 | 素面玛丽珍 | 玛丽珍+新增蝴蝶结 | ❌ 多了装饰 |
-| 材质 | PVC 哑光 | 瓷器釉面 | ❌ 质感变了 |
-| 泰迪熊 | 左白棕结/右棕白结 | 左白棕结/右棕白结 | ✅ 不变 |
-| 左手姿势 | 抬脸握拳 | 抬脸握拳 | ✅ 不变 |
+| Element | R3 (expected) | R4 (actual) | Correct? |
+|---------|--------------|-------------|----------|
+| Dress color | peach | light blue | ✅ |
+| Braid-end bows | WHITE | light blue | ❌ |
+| Star hairpins | 3 WHITE on forehead | 1 blue+white on side | ❌ |
+| Head bows | pink+white | all white | ❌ |
+| Bonnet | white lace | white+blue lining | ❌ |
+| Heart pillow | PINK | light blue+added bow | ❌ |
+| Apron | plain white | white+added blue bow | ❌ |
+| Socks | white over-knee lace | white ankle ribbed | ❌ |
+| Shoes | plain cream Mary Jane | cream Mary Jane+added bow | ❌ |
+| Material | PVC matte | porcelain/ceramic glaze | ❌ |
+| Teddy bears | correct | correct | ✅ |
+| Left hand pose | correct | correct | ✅ |
 
-## 根因
+## Root Cause
 
-gpt-image-2 对颜色词的语义扩散极强。`LIGHT BLUE dress` 被模型理解为"做一个蓝色系的版本"，而非"只改裙子颜色"。模型自行扩散到发饰、抱枕、围裙、袜子、鞋子、材质等所有元素。
+gpt-image-2 has extremely strong **color semantic diffusion**. A single
+color word in one element's description is interpreted as a global theme
+directive. The model doesn't understand "change ONLY the dress color" —
+it understands "the user wants a blue version."
 
-## 对策
+## Fix
 
-在 prompt 的 `Preserve list` 中显式锁定所有不该变的元素：
-
-```
-Preserve list:
-- ... (existing items)
-- Hair bow colors remain white (NOT blue)
-- Star hairpins remain white, 3 in a row across forehead
-- Heart pillow remains pink with white lace edge
-- Apron remains plain white with no added decorations
-- Socks remain white over-knee with frilled cuffs
-- Shoes remain plain cream Mary Jane style with no added bows
-- Material remains matte PVC/vinyl (NOT porcelain/ceramic)
-```
-
-在 `Change only` 中只写要改的元素：
+Use the `DO NOT CHANGE` section to explicitly lock every element that
+should stay the same. Be specific about colors, counts, styles, and materials:
 
 ```
-Change only:
-- Dress color changes from peach to light blue
+DO NOT CHANGE:
+- Hair bow color (must stay WHITE)
+- Star hairpin color and count (must stay WHITE, exactly THREE)
+- Bonnet color (WHITE lace, no colored lining)
+- Heart pillow color (must stay PINK)
+- Apron color and style (WHITE, heart-shaped hem, no added decorations)
+- Sock style and length (WHITE over-knee with lace trim)
+- Shoe style and color (cream Mary Jane, no added bow)
+- Teddy bear colors and bowtie colors
+- Material (glossy vinyl plastic — NOT porcelain/ceramic)
 ```
 
-## 与 gpt-image-2 三段式规范的关系
+## Prevention
 
-这个陷阱恰好验证了 wiki `entities/gpt-image-2` 中三段式规范的必要性：
-
-- `Preserve list` 不是可选的——它是防止模型自行扩散的唯一防线
-- `Change only` 必须精确到单元素级别，不能写 "change the color scheme to blue"
-- `Do NOT add` 需要覆盖"不要新增装饰"这类隐性扩散
+When changing ANY single element in a follow-up round:
+1. List the change in `CHANGE ONLY`
+2. List EVERY other element in `DO NOT CHANGE` with explicit color/style/material
+3. Never assume the model will keep unchanged elements stable

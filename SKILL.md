@@ -208,21 +208,93 @@ Appearance（参考图权威）：
 ## 执行顺序
 
 ```
-输入参考图 → 迭代生成（≤5轮） → 最终评比
+Stage 0: 参考图预处理 → Step 1: 迭代生成（≤5轮） → Step 2: 最终评比
 ```
 
+- Stage 0 每项目执行一次，清理参考图中的背景/五官/漂浮物/头发问题
 - 迭代上限 **5 轮**，超过后强制进入最终评比
 - 最终评比对全部迭代输出打分排序
 
 ### API 资源约束
 
+- Stage 0: 1× Meshy image-to-image（gpt-image-2, 9-12 credits）
 - 每轮消耗 1 次 `image_gen` 调用
 - 5 轮上限 = 最多 5 次 `image_gen`
-- 视觉分析全部内化，**零外部视觉 API 消耗**
+- 视觉分析使用 `browser_vision`，**零外部视觉 API 消耗**
 
 ---
 
-## Step 1 — 多轮迭代生成与视觉检验（最多5轮）
+## Stage 0 — 参考图预处理（强制）
+
+> 详见 `references/stage0-preprocess.md` | 脚本 `scripts/stage0_preprocess.py`
+
+### 目的
+
+原始参考图可能包含不适合 DRE 管线的元素：复杂背景、面部五官、漂浮道具、卷曲/镂空/翘起的头发。Stage 0 使用 Meshy gpt-image-2 的 image-to-image 接口自动清理。
+
+### 执行
+
+```bash
+python3 scripts/stage0_preprocess.py \
+  ~/DRE_Projects/{project}/input/reference.png \
+  ~/DRE_Projects/{project}/input/
+```
+
+### 输出
+
+| 产物 | 路径 | 说明 |
+|------|------|------|
+| 预处理参考图 | `input/reference_clean.png` | 替代原始 reference.png |
+| 提示词 | `input/stage0_prompt.md` | 预处理 prompt |
+| API 响应 | `input/stage0_result.json` | Meshy 原始返回 |
+
+### 清理内容
+
+| 问题 | 处理 |
+|------|------|
+| 复杂背景 | → 纯白 (#FFFFFF) |
+| 面部五官 | → 完全移除，面部留白 |
+| 漂浮道具 | → 移除（保留手持/穿戴的实体道具） |
+| 头发卷曲/镂空/翘起 | → 实心塑料块，圆钝末端 |
+| 尖锐发梢 | → 圆角化 |
+
+### 后续
+
+预处理完成后，DRE 流程使用 `reference_clean.png`：
+- `browser_vision` 检验时对比 `reference_clean.png`
+- 纯文本策略下 agent 从 `reference_clean.png` 提取外观特征
+- 双图策略下 `reference_clean.png` 作为 Image 2 传入
+
+### 容错
+
+- Meshy API 不可用 → 跳过，使用原始参考图，打印警告
+- 预处理结果明显损坏 → 保留原始参考图，标记"预处理失败"
+- 原始 `reference.png` 始终保留不覆盖
+
+#### 0.6 预处理输出
+
+预处理完成后，在 `input/preprocess.md` 中记录：
+
+```markdown
+# Stage 0 预处理报告
+
+## 已过滤元素
+- [列出从参考图中识别但不提取的元素]
+
+## 已转换元素
+- [列出做了 3D 适配转换的元素及转换方式]
+
+## 最终提取的外观清单
+- 发型: [转换后描述]
+- 头饰: [描述]
+- 服装: [转换后描述]
+- 鞋履: [描述]
+- 配饰: [描述]
+- 道具: [描述]
+- 姿态: [描述]
+```
+
+此清单直接作为首轮 APPEARANCE 段的填写依据。
 
 ### 目的
 利用 `image_gen` 的固定双图策略生成成品，每轮后主模型内部视觉检验，动态调整。
