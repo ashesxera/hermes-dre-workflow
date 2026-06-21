@@ -1,7 +1,7 @@
 ---
 name: dre-workflow
-description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.3: gpt-image-2 optimized prompt template with Job+Preserve/Change/Do NOT add+Constraints structure."
-version: 2.3.0
+description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.4: dual browser_vision per round (Shape vs template, Pose+Appearance vs reference), 2-image side-by-side for sharper detail."
+version: 2.4.0
 platforms: [macos, linux]
 repository: https://github.com/ashesxera/hermes-dre-workflow
 ---
@@ -14,7 +14,15 @@ repository: https://github.com/ashesxera/hermes-dre-workflow
 
 ---
 
-## 核心变更（v2.2）
+## 核心变更（v2.4）
+
+| 维度 | v2.3 | v2.4 |
+|------|------|------|
+| 视觉检验 | 主模型内部视觉 / vision_analyze 回退 | **browser_vision 多图并排**（统一方案） |
+| 跨图对比 | 文字描述→文字描述（间接） | **像素级并排对比**（直接） |
+| 工具依赖 | 依赖主模型多模态能力 | **所有模型通用** |
+
+### v2.3
 
 | 维度 | v2.1 | v2.2 |
 |------|------|------|
@@ -152,7 +160,26 @@ Appearance（参考图权威）：
 
 **重要**：回退模式下无法做到真正的"同时跨图对比"（`vision_analyze` 每次只看一张图），因此需要先分别获取模板图和参考图的特征描述，再将描述嵌入检验 question 中供辅助视觉模型做逻辑对比。这不是理想方案，但在主模型非多模态时是唯一可行路径。
 
-**多图对比模式**（每轮检验、最终评比）：
+### 模式 C：browser_vision 多图并排对比（推荐，所有模型通用）
+
+当需要真正的像素级跨图对比时（每轮检验、最终评比），使用 `browser_vision` 将多张图拼到一个 HTML 页面中一次性分析：
+
+```
+1. 写 HTML 文件 → 2×2 grid 布局，放入生成图 + 模板图 + 参考图
+   （使用 grid-template-columns: repeat(2, 1fr)，max-height: 300px）
+2. browser_navigate → 加载 HTML
+3. browser_vision → 一次性跨图对比，直接输出逐项判定
+```
+
+**优势**：
+- 真正的像素级并排对比，不是文字描述→文字描述的间接对比
+- `vision_analyze` 每次只看一张图，三图对比需要 3 次调用 + 逻辑拼接
+- `browser_vision` 截取整个页面（非视口），所有图一次性可见
+- 所有模型通用，不依赖主模型是否多模态
+
+**HTML 模板**：见 `templates/dre-compare.html`
+
+**多图对比模式**（主模型多模态时可用，作为备选）：
 
 ```
 1. 将多张图片同时加载到上下文（生成图、模板图、参考图）
@@ -160,7 +187,7 @@ Appearance（参考图权威）：
 3. 写入报告
 ```
 
-> ⚠️ 多图对比模式仅在主模型支持多模态时可用。回退模式下需逐图分析后逻辑对比。
+> ⚠️ 多图对比模式仅在主模型支持多模态时可用。**推荐优先使用模式 C（browser_vision）**，因为它不依赖主模型能力且是真正的像素级对比。
 
 ---
 
@@ -275,8 +302,10 @@ Constraints:
 2. 调用 image_gen（模板图 + 参考图）
 3. 保存 output.png 到 r{N}/
 4. 保存本轮实际使用的 prompt 到 r{N}/prompt.md
-5. 将 output.png + 模板图 + 参考图 加载到主模型上下文
-6. 主模型内部视觉逐项判定检验清单（必须直接看图对比）
+5. 写 HTML 文件（2×1 grid：生成图 + 模板图），browser_navigate → browser_vision
+   → 检验 Shape 层（比例、材质、轮廓、面部留白、肢体）
+6. 写 HTML 文件（2×1 grid：生成图 + 参考图），browser_navigate → browser_vision
+   → 检验 Pose + Appearance 层（姿势、发型、服装、配饰、道具）
 7. 写入检验报告 r{N}/inspection.md
 8. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
 ```
@@ -286,31 +315,63 @@ Constraints:
 
 ### 视觉检验清单（每轮必做）
 
-**强制操作规范**：
+**强制操作规范**：每轮分两次 `browser_vision`，每次只对比两张图。
 
-1. 必须将**三张图片同时**加载到当前对话上下文：
-   - 生成图：`r{N}/output.png`
-   - 标准模板图：`assets/default_template.png`
-   - 原始参考图：`input/reference.png`
+#### 第一次：生成图 vs 模板图（Shape 层）
 
-2. 向主模型发送指令：
+1. 写 HTML 文件，2×1 并排布局：
+   - 左：生成图 `r{N}/output.png`
+   - 右：标准模板图 `assets/default_template.png` 或 `input/template.png`
+
+2. `browser_navigate` 加载 HTML
+
+3. `browser_vision` 发送指令：
    ```
-   请直接对比上面三张图片（生成图、模板图、参考图）。
-   注意：我们不是在比较"生成图是否和参考图一模一样"，
-   而是检验"参考图的角色身份是否被正确迁移到了 vinyl toy 形态中"。
-   请逐层检验以下清单，不得依赖文本记忆描述参考图特征。
+   请直接对比屏幕上并排的两张图（左=生成图，右=模板图）。
+   只关注 Shape 层：比例、材质、轮廓、面部、肢体。
+   逐项判定以下清单：
+   
+   S1 头身比 — 生成图的头部占比是否接近模板图（~50-60%）？
+   S2 头部大小/形状 — 是否一致（圆-椭圆，无明显变形）？
+   S3 四肢粗细/长度 — 是否一致（短粗圆钝无手指）？
+   S4 整体轮廓/剪影 — 是否一致（圆润无锋角）？
+   S5 材质 — 是否统一哑光塑料质感（无布料/皮肤/金属）？
+   S6 面部 — 是否完全留白（无五官痕迹）？
+   S7 肢体数 — 是否恰好 2 臂 2 腿？
+   
+   每项判定 ✅ 通过 / ❌ 失败 / ⚠️ 偏差。
    ```
 
-3. 主模型利用内部多模态视觉能力，**实时跨图对比**后输出判定结果。
+#### 第二次：生成图 vs 参考图（Pose + Appearance 层）
 
-4. **P2 强制分步检验（防对称化偏好）**：在整体检验之外，必须额外发送两条独立指令：
+4. 写 HTML 文件，2×1 并排布局：
+   - 左：生成图 `r{N}/output.png`
+   - 右：原始参考图 `input/reference.png`
+
+5. `browser_navigate` 加载 HTML
+
+6. `browser_vision` 发送指令：
    ```
-   请单独描述参考图中左手（画面左侧）在做什么？右手（画面右侧）在做什么？
-   然后对比生成图中左手和右手分别是否匹配。
-   禁止用"手臂位置大致对"通过——必须逐手确认。
+   请直接对比屏幕上并排的两张图（左=生成图，右=参考图）。
+   只关注 Pose 和 Appearance 层：姿势、发型、服装、配饰、道具。
+   逐项判定以下清单：
+   
+   P1 头部朝向/倾斜 — 生成图是否传递出参考图的氛围？
+   P2 手臂位置 — 逐手对比：参考图左手（画面左侧）在做什么？
+       右手（画面右侧）在做什么？生成图是否分别匹配？
+       禁止用"手臂位置大致对"通过。
+   P3 腿部位置/重心 — 是否传递出参考图的氛围？
+   P4 躯干旋转 — 是否传递出参考图的氛围？
+   
+   A1 发型 — 样式+发饰+发色是否迁移（塑料化特征）？
+   A2 服装 — 款式+颜色+层次是否迁移？
+   A3 配饰/道具 — 是否迁移（数量+位置）？
+   A4 鞋履 — 款式+颜色是否迁移？
+   A5 整体配色 — 主色/辅色/点缀色是否匹配？
+   A6 装饰物附着面 — 物理位置是否合理（如标记在皮肤上而非头发上）？
+   
+   每项判定 ✅ 通过 / ❌ 失败 / ⚠️ 偏差。
    ```
-   原因：agent 天然倾向对称化处理，容易把非对称手势（一手抬脸一手抱物）
-   简化为双手对称。整体检验时这个细节极易被忽略，必须用独立问题强制关注。
 
 ---
 
@@ -625,10 +686,10 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 
 | Step | 方式 | 用途 |
 |------|------|------|
-| Step 1（迭代生成） | `image_gen` + 主模型内部视觉（或 `vision_analyze` 回退） | 生成 + 每轮检验 |
-| Step 2（最终评比） | 主模型内部视觉（或 `vision_analyze` 回退） | 深度评比打分 |
+| Step 1（迭代生成） | `image_gen` + `browser_vision` | 生成 + 每轮跨图检验 |
+| Step 2（最终评比） | `browser_vision` | 多图并排深度评比打分 |
 
-**视觉分析优先使用主模型内部能力，非多模态模型回退到 `vision_analyze`。**
+**视觉检验统一使用 `browser_vision` 多图并排模式**——将生成图、模板图、参考图拼入 HTML 2×2 grid，一次性跨图对比。不依赖主模型是否多模态，所有模型通用。
 
 ### ⚠️ 重要：image_gen 必须在主会话中直接调用
 
@@ -649,10 +710,9 @@ Hermes 插件为**进程级缓存**：
 
 | 步骤 | 消耗 | 说明 |
 |------|------|------|
-| Step 1（≤5轮） | ≤5× `image_gen` + 主模型 ≤5 轮看图 | 唯一外部调用 |
-| Step 2 | 主模型 1 轮看多图 | 零外部 API（主模型多模态时） |
-| Step 2（回退） | ≤N× `vision_analyze` | 非多模态模型回退时额外消耗 |
-| **总计上限** | **≤5× `image_gen` + ≤N× `vision_analyze`** | 视觉分析优先内化 |
+| Step 1（≤5轮） | ≤5× `image_gen` + ≤5× `browser_vision` | 生成 + 跨图检验 |
+| Step 2 | 1× `browser_vision` | 多图并排评比 |
+| **总计上限** | **≤5× `image_gen` + ≤6× `browser_vision`** | browser_vision 不消耗外部视觉 API |
 
 ---
 
@@ -682,6 +742,7 @@ Hermes 插件为**进程级缓存**：
 - `references/lolita-bonnet-girl-case-study.md` — v1.x 案例，多肢体缺陷修复
 - `references/band-aid-placement-case-study.md` — v2.x 案例，创可贴物理附着面判断失误与修复，双图策略优化与三图注入检验法
 - `references/asymmetric-pose-spatial-anchor-case-study.md` — v2.2 案例，非对称姿态被对称化 + 左右手镜像反转，空间锚定法修正
+- `references/color-diffusion-pitfall.md` — v2.3 案例，gpt-image-2 颜色词语义扩散：单元素颜色变更被模型理解为全局主题重设计
 
 ---
 
