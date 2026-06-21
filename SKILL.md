@@ -337,17 +337,18 @@ python3 scripts/step0_preprocess.py \
 1. 构建本轮 prompt（按策略文档）
 2. 调用 image_gen（模板图 + 参考图）
 3. 保存 output.png 到 r{N}/
-4. 保存本轮实际使用的 prompt 到 r{N}/prompt.md
-5. 写 HTML 文件（三图并列 + ASCII 进度条），browser_navigate 打开
-6. vision_analyze(生成图) → 文字描述 A
+4. 复制模板图和参考图到 r{N}/（避免跨目录加载慢）
+5. 保存本轮实际使用的 prompt 到 r{N}/prompt.md
+6. 写 HTML 文件（三图并列 + ASCII 进度条），所有图片使用 r{N}/ 下的副本，browser_navigate 打开
+7. vision_analyze(生成图) → 文字描述 A
    vision_analyze(模板图) → 文字描述 B
    vision_analyze(参考图) → 文字描述 C
-7. agent 对比 A vs B → Shape 层 S1-S7 逐项判定
+8. agent 对比 A vs B → Shape 层 S1-S7 逐项判定
    agent 对比 A vs C → Pose 层 P1-P4 + Appearance 层 A1-A6 逐项判定
    → 合并为完整检验报告
-8. 报告写入 HTML 替换进度条，browser_navigate 打开
+9. 报告写入 HTML 替换进度条，browser_navigate 打开
    → 预览窗口：三图并列 + 完整检验报告
-9. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
+10. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
 ```
 
 **检验逻辑**：`vision_analyze` 单图分析准确但双图并排时幻觉严重（kimi-k2.6 已验证）。
@@ -382,8 +383,8 @@ python3 scripts/step0_preprocess.py \
 
 <div class="compare">
   <div class="card"><img src="file:///.../r{N}/output.png"><p>生成图 R{N}</p></div>
-  <div class="card"><img src="file:///.../template.png"><p>模板图</p></div>
-  <div class="card"><img src="file:///.../reference_clean.png"><p>参考图</p></div>
+  <div class="card"><img src="file:///.../r{N}/template.png"><p>模板图</p></div>
+  <div class="card"><img src="file:///.../r{N}/reference_clean.png"><p>参考图</p></div>
 </div>
 
 <div class="report">
