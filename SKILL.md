@@ -1,7 +1,7 @@
 ---
 name: dre-workflow
-description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.5: strategy split (text-only vs dual-image) by provider capability, references/strategy-*.md."
-version: 2.5.0
+description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.6: vision_analyze single-image analysis + agent text comparison replaces browser_vision multi-image hallucination-prone inspection."
+version: 2.6.0
 platforms: [macos, linux]
 repository: https://github.com/ashesxera/hermes-dre-workflow
 ---
@@ -79,13 +79,11 @@ repository: https://github.com/ashesxera/hermes-dre-workflow
 ├── r1/
 │   ├── output.png                 # R1 生成图
 │   ├── prompt.md                  # R1 使用的提示词
-│   ├── shape_check.html           # R1 Shape 层检验（图+报告）
-│   └── appearance_check.html      # R1 Pose+Appearance 层检验（图+报告）
+│   └── inspection.html            # R1 检验报告（三图+报告）
 ├── r2/
 │   ├── output.png
 │   ├── prompt.md
-│   ├── shape_check.html
-│   └── appearance_check.html
+│   └── inspection.html
 ├── r3/
 ├── r4/
 ├── r5/
@@ -340,34 +338,39 @@ python3 scripts/step0_preprocess.py \
 2. 调用 image_gen（模板图 + 参考图）
 3. 保存 output.png 到 r{N}/
 4. 保存本轮实际使用的 prompt 到 r{N}/prompt.md
-5. 写 HTML 文件（2×1 grid：生成图 + 模板图），browser_navigate → browser_vision
-   → 检验 Shape 层，拿到结果文本
-6. 将检验结果写入同一 HTML 文件（图片下方），browser_navigate 打开
-   → 预览窗口同时看到对比图 + Shape 检验报告
-7. 写 HTML 文件（2×1 grid：生成图 + 参考图），browser_navigate → browser_vision
-   → 检验 Pose + Appearance 层，拿到结果文本
-8. 将检验结果写入同一 HTML 文件（图片下方），browser_navigate 打开
-   → 预览窗口同时看到对比图 + Pose/Appearance 检验报告
-9. 合并两次检验结果，写入 r{N}/shape_check.html 和 r{N}/appearance_check.html 归档
-10. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
+5. 写 HTML 文件（三图并列 + ASCII 进度条），browser_navigate 打开
+6. vision_analyze(生成图) → 文字描述 A
+   vision_analyze(模板图) → 文字描述 B
+   vision_analyze(参考图) → 文字描述 C
+7. agent 对比 A vs B → Shape 层 S1-S7 逐项判定
+   agent 对比 A vs C → Pose 层 P1-P4 + Appearance 层 A1-A6 逐项判定
+   → 合并为完整检验报告
+8. 报告写入 HTML 替换进度条，browser_navigate 打开
+   → 预览窗口：三图并列 + 完整检验报告
+9. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
 ```
+
+**检验逻辑**：`vision_analyze` 单图分析准确但双图并排时幻觉严重（kimi-k2.6 已验证）。
+因此回退到单图逐一分析 + agent 文字对比模式。`browser_vision` 不再承担检验职责，
+仅用于呈现三图并列的 UI 效果。
 
 **HTML 格式规范**：
 
-步骤 5 写入时使用**等待态模板**（ASCII 进度条动画），步骤 6 `browser_vision` 返回后替换为实际报告。
+步骤 5 写入**等待态模板**（三图并列 + ASCII 进度条），步骤 7 完成后替换为实际报告。
 
 ```html
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
   body { background: #222; color: #ddd; font-family: -apple-system, monospace; padding: 20px; }
   h2 { color: #e2e8f0; margin: 0 0 12px; }
-  .compare { display: flex; gap: 12px; margin-bottom: 20px; }
-  .card { flex: 1; text-align: center; }
-  .card img { max-height: 420px; max-width: 100%; object-fit: contain; border-radius: 6px; }
-  .card p { color: #94a3b8; font-size: 13px; margin: 6px 0 0; }
+  .compare { display: flex; gap: 10px; margin-bottom: 20px; }
+  .card { flex: 1; text-align: center; min-width: 0; }
+  .card img { max-height: 350px; max-width: 100%; object-fit: contain; border-radius: 6px; }
+  .card p { color: #94a3b8; font-size: 12px; margin: 5px 0 0; }
   .report { background: #1a1a2e; padding: 20px; border-radius: 8px;
             white-space: pre-wrap; line-height: 1.6; max-width: 960px; font-size: 14px; }
   .pass { color: #4ade80; } .fail { color: #f87171; } .warn { color: #fbbf24; }
+  .section { color: #60a5fa; font-weight: bold; margin-top: 16px; display: block; }
   .summary { font-size: 16px; font-weight: bold; margin-top: 16px; padding-top: 12px; border-top: 1px solid #334155; }
   .waiting { text-align: center; padding: 30px 0; }
   .waiting .frame { font-family: "Courier New", monospace; font-size: 13px; color: #60a5fa; line-height: 1.3; white-space: pre; }
@@ -375,20 +378,21 @@ python3 scripts/step0_preprocess.py \
   @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
 </style></head><body>
 
-<h2>R{N} [Shape/Pose+Appearance] 层检验</h2>
+<h2>R{N} 检验报告 — 生成图 vs 模板图 vs 参考图</h2>
 
 <div class="compare">
   <div class="card"><img src="file:///.../r{N}/output.png"><p>生成图 R{N}</p></div>
-  <div class="card"><img src="file:///.../[template|reference].png"><p>[模板图|参考图]</p></div>
+  <div class="card"><img src="file:///.../template.png"><p>模板图</p></div>
+  <div class="card"><img src="file:///.../reference_clean.png"><p>参考图</p></div>
 </div>
 
 <div class="report">
 <div class="waiting">
 <div class="frame" id="bar">╔══════════════════════════════════════╗
 ║▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║
-║         analyzing shape...          ║
+║         analyzing images...          ║
 ╚══════════════════════════════════════╝</div>
-<div class="label">⏳ 正在对比图像...</div>
+<div class="label">⏳ vision_analyze 正在逐图分析...</div>
 </div>
 </div>
 
@@ -396,14 +400,14 @@ python3 scripts/step0_preprocess.py \
 (function(){
   var f=document.getElementById('bar');
   var frames=[
-    "╔══════════════════════════════════════╗\n║▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║         analyzing shape...          ║\n╚══════════════════════════════════════╝",
-    "╔══════════════════════════════════════╗\n║▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║       extracting proportions...     ║\n╚══════════════════════════════════════╝",
-    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║        checking silhouette...       ║\n╚══════════════════════════════════════╝",
-    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░║\n║        scanning materials...        ║\n╚══════════════════════════════════════╝",
-    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░║\n║        inspecting face area...      ║\n╚══════════════════════════════════════╝",
-    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░║\n║        counting limbs...            ║\n╚══════════════════════════════════════╝",
-    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░║\n║        compiling report...          ║\n╚══════════════════════════════════════╝",
-    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░║\n║        finalizing...                ║\n╚══════════════════════════════════════╝"
+    "╔══════════════════════════════════════╗\n║▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║         analyzing output...          ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║       analyzing template...          ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║        analyzing reference...        ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░║\n║        comparing Shape layer...      ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░║\n║        comparing Pose layer...       ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░║\n║        comparing Appearance...       ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░║\n║        compiling report...           ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░║\n║        finalizing...                 ║\n╚══════════════════════════════════════╝"
   ];
   var i=0;
   setInterval(function(){ f.textContent=frames[i]; i=(i+1)%frames.length; }, 600);
@@ -413,13 +417,13 @@ python3 scripts/step0_preprocess.py \
 </body></html>
 ```
 
-> 步骤 5：写入等待态 HTML → `browser_navigate` 打开 → 用户看到图 + 进度条
-> 步骤 6：`browser_vision` 看图检验 → 返回结果文本
-> 步骤 6 后：用结果文本替换 `<div class="waiting">...</div>` 整块 → `browser_navigate` 重新打开 → 用户看到图 + 真实报告
+> 步骤 5：写入等待态 HTML → `browser_navigate` → 用户看到三图 + 进度条
+> 步骤 6：三次 `vision_analyze` 逐图分析
+> 步骤 7：agent 文字对比，生成报告
+> 步骤 8：报告替换 `<div class="waiting">...</div>` → `browser_navigate` → 完整检验页
 
 **强制存档检查（每轮必做）**：
-- 如果未能成功写入 `prompt.md` 或检验 HTML，立即补写。
-- `inspection.md` 不再单独维护，HTML 文件本身就是完整检验档案。
+- 如果未能成功写入 `prompt.md` 或 `inspection.html`，立即补写。
 
 ### 每轮输出
 
@@ -427,68 +431,61 @@ python3 scripts/step0_preprocess.py \
 |------|------|------|
 | R1-R5 生成图 | `r{N}/output.png` | PNG |
 | R1-R5 提示词 | `r{N}/prompt.md` | Markdown |
-| R1-R5 Shape 检验 | `r{N}/shape_check.html` | HTML（图+报告） |
-| R1-R5 Pose/Appearance 检验 | `r{N}/appearance_check.html` | HTML（图+报告） |
+| R1-R5 检验报告 | `r{N}/inspection.html` | HTML（三图+报告） |
 
 ### 视觉检验清单（每轮必做）
 
-**强制操作规范**：每轮分两次 `browser_vision`，每次只对比两张图。
+**强制操作规范**：用 `vision_analyze` 分别获取三张图的文字描述，agent 做文字层面逐项比对。
 
-#### 第一次：生成图 vs 模板图（Shape 层）
+#### 步骤 6：逐图分析
 
-1. 写 HTML 文件，2×1 并排布局：
-   - 左：生成图 `r{N}/output.png`
-   - 右：标准模板图 `assets/default_template.png` 或 `input/template.png`
+```
+vision_analyze(生成图, "请详细描述这张 vinyl toy 手办的所有特征：
+  头身比例、面部状态（是否有五官）、发型、头饰、服装、配饰、
+  鞋子、道具、材质质感、背景、姿势（头部朝向、左右手各自的动作
+  和位置、腿部姿态、躯干朝向）。逐项列出。")
 
-2. `browser_navigate` 加载 HTML
+vision_analyze(模板图, "请详细描述这张标准模板图的所有特征：
+  头身比例、头部大小和形状、面部状态、身体轮廓、四肢粗细、
+  材质质感、服装、发型、鞋子。这是 Shape 权威源。")
 
-3. `browser_vision` 发送指令：
-   ```
-   请直接对比屏幕上并排的两张图（左=生成图，右=模板图）。
-   只关注 Shape 层：比例、材质、轮廓、面部、肢体。
-   逐项判定以下清单：
-   
-   S1 头身比 — 生成图的头部占比是否接近模板图（~50-60%）？
-   S2 头部大小/形状 — 是否一致（圆-椭圆，无明显变形）？
-   S3 四肢粗细/长度 — 是否一致（短粗圆钝无手指）？
-   S4 整体轮廓/剪影 — 是否一致（圆润无锋角）？
-   S5 材质 — 是否统一哑光塑料质感（无布料/皮肤/金属）？
-   S6 面部 — 是否完全留白（无五官痕迹）？
-   S7 肢体数 — 是否恰好 2 臂 2 腿？
-   
-   每项判定 ✅ 通过 / ❌ 失败 / ⚠️ 偏差。
-   ```
+vision_analyze(参考图, "请详细描述这张参考图的所有外观特征：
+  发型（结构+发饰+发色）、头饰、服装（款式+颜色+层次）、
+  配饰/道具（种类+数量+位置+颜色）、鞋履（款式+颜色+袜子）、
+  配色方案、姿势（头部朝向、左右手各自的动作和位置、腿部姿态、
+  躯干朝向）。这是 Appearance 和 Pose 源。")
+```
 
-#### 第二次：生成图 vs 参考图（Pose + Appearance 层）
+#### 步骤 7：文字对比判定
 
-4. 写 HTML 文件，2×1 并排布局：
-   - 左：生成图 `r{N}/output.png`
-   - 右：原始参考图 `input/reference.png`
+agent 基于三份文字描述，逐项判定：
 
-5. `browser_navigate` 加载 HTML
+```
+Shape 层（生成图 vs 模板图描述）：
+  S1 头身比 — 生成图头部占比是否接近模板（~50-60%）？
+  S2 头部大小/形状 — 是否一致？
+  S3 四肢粗细/长度 — 是否短粗圆钝无手指？
+  S4 整体轮廓/剪影 — 是否圆润无锋角？
+  S5 材质 — 是否统一塑料质感？
+  S6 面部 — 是否完全留白无五官？
+  S7 肢体数 — 是否恰好 2 臂 2 腿？
 
-6. `browser_vision` 发送指令：
-   ```
-   请直接对比屏幕上并排的两张图（左=生成图，右=参考图）。
-   只关注 Pose 和 Appearance 层：姿势、发型、服装、配饰、道具。
-   逐项判定以下清单：
-   
-   P1 头部朝向/倾斜 — 生成图是否传递出参考图的氛围？
-   P2 手臂位置 — 逐手对比：参考图左手（画面左侧）在做什么？
-       右手（画面右侧）在做什么？生成图是否分别匹配？
-       禁止用"手臂位置大致对"通过。
-   P3 腿部位置/重心 — 是否传递出参考图的氛围？
-   P4 躯干旋转 — 是否传递出参考图的氛围？
-   
-   A1 发型 — 样式+发饰+发色是否迁移（塑料化特征）？
-   A2 服装 — 款式+颜色+层次是否迁移？
-   A3 配饰/道具 — 是否迁移（数量+位置）？
-   A4 鞋履 — 款式+颜色是否迁移？
-   A5 整体配色 — 主色/辅色/点缀色是否匹配？
-   A6 装饰物附着面 — 物理位置是否合理（如标记在皮肤上而非头发上）？
-   
-   每项判定 ✅ 通过 / ❌ 失败 / ⚠️ 偏差。
-   ```
+Pose 层（生成图 vs 参考图描述）：
+  P1 头部朝向 — 是否匹配？
+  P2 手臂位置 — 逐手对比：参考图左手做什么？右手做什么？生成图是否分别匹配？
+  P3 腿部位置/重心 — 是否匹配？
+  P4 躯干朝向 — 是否匹配？
+
+Appearance 层（生成图 vs 参考图描述）：
+  A1 发型 — 样式+发饰+发色是否迁移？
+  A2 服装 — 款式+颜色+层次是否迁移？
+  A3 配饰/道具 — 种类+数量+位置+颜色是否迁移？
+  A4 鞋履 — 款式+颜色是否迁移？
+  A5 整体配色 — 主色/辅色/点缀色是否匹配？
+  A6 装饰物附着面 — 物理位置是否合理？
+```
+
+每项判定 ✅ 通过 / ❌ 失败 / ⚠️ 偏差。
 
 ---
 
@@ -794,7 +791,8 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 | 面部标记（创可贴/贴纸）被错误放置在头发而非皮肤上 | Step 1 | Prompt 中用 "on the FOREHEAD skin above the bangs, NOT on the hair" 精确定位 |
 | 条纹/针织纹理平面化 | Step 1 | 用 "thick wide knit stripes" / "chunky ribbed knit texture" 替代笼统描述 |
 | 腮红被错误处理成面部贴纸 | Step 1 | 默认忽略参考图中的自然腮红 |
-| 迭代轮次遗漏存档 prompt.md / 检验 HTML | Step 1 | 每轮结束后必须确认 prompt.md + shape_check.html + appearance_check.html 已写入，未写入则立即补写 |
+| 迭代轮次遗漏存档 prompt.md / inspection.html | Step 1 | 每轮结束后必须确认 prompt.md + inspection.html 已写入，未写入则立即补写 |
+| **browser_vision 双图并排幻觉**：vision 模型（kimi-k2.6）在双图并排时严重误读（编造头部倾斜、躯干旋转、错误手势） | Step 1 检验 | 回退到 `vision_analyze` 单图逐一分析 + agent 文字对比模式。browser_vision 仅用于呈现三图并列 UI |
 | **image_gen edits 端点不稳定**：代理的 `/v1/images/edits` 可能 SSL 错误或超时 | Step 1 | 遇到 edits 失败时自动回退到 generations（text-only），在 prompt 中补全外观描述；双图策略降级为单图 |
 | **对称性偏好导致非对称姿态丢失**：agent 天然倾向对称化处理，容易将参考图的非对称手势（如一手抬脸一手抱物）简化为双手对称 | Step 1 检验 | P2 检验时必须**逐手对比**：左手（画面左侧）在参考图中做什么？右手（画面右侧）在参考图中做什么？生成图是否分别匹配？禁止仅凭"手臂位置大致对"通过 |
 
@@ -804,10 +802,11 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 
 | Step | 方式 | 用途 |
 |------|------|------|
-| Step 1（迭代生成） | `image_gen` + `browser_vision` | 生成 + 每轮跨图检验 |
-| Step 2（最终评比） | `browser_vision` | 多图并排深度评比打分 |
+| Step 1（迭代生成） | `image_gen` + `vision_analyze` | 生成 + 单图分析 + agent 文字对比 |
+| Step 2（最终评比） | `vision_analyze` + agent 对比 | 逐轮单图分析 + 文字对比评分 |
 
-**视觉检验统一使用 `browser_vision` 多图并排模式**——将生成图、模板图、参考图拼入 HTML 2×2 grid，一次性跨图对比。不依赖主模型是否多模态，所有模型通用。
+**检验逻辑**：`vision_analyze` 逐图获取文字描述 → agent 文字层面逐项比对 → 写入 `inspection.html`。
+`browser_vision` 仅用于呈现三图并列 UI，不承担检验职责。
 
 ### ⚠️ 重要：image_gen 必须在主会话中直接调用
 
@@ -828,9 +827,9 @@ Hermes 插件为**进程级缓存**：
 
 | 步骤 | 消耗 | 说明 |
 |------|------|------|
-| Step 1（≤5轮） | ≤5× `image_gen` + ≤5× `browser_vision` | 生成 + 跨图检验 |
-| Step 2 | 1× `browser_vision` | 多图并排评比 |
-| **总计上限** | **≤5× `image_gen` + ≤6× `browser_vision`** | browser_vision 不消耗外部视觉 API |
+| Step 1（≤5轮） | ≤5× `image_gen` + ≤15× `vision_analyze` | 生成 + 每轮 3 次单图分析 |
+| Step 2 | ≤5× `vision_analyze` | 逐轮单图分析 + agent 文字对比 |
+| **总计上限** | **≤5× `image_gen` + ≤20× `vision_analyze`** | |
 
 ---
 
