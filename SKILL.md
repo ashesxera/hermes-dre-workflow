@@ -79,11 +79,13 @@ repository: https://github.com/ashesxera/hermes-dre-workflow
 ├── r1/
 │   ├── output.png                 # R1 生成图
 │   ├── prompt.md                  # R1 使用的提示词
-│   └── inspection.md              # R1 视觉检验报告
+│   ├── shape_check.html           # R1 Shape 层检验（图+报告）
+│   └── appearance_check.html      # R1 Pose+Appearance 层检验（图+报告）
 ├── r2/
 │   ├── output.png
 │   ├── prompt.md
-│   └── inspection.md
+│   ├── shape_check.html
+│   └── appearance_check.html
 ├── r3/
 ├── r4/
 ├── r5/
@@ -346,7 +348,7 @@ python3 scripts/step0_preprocess.py \
    → 检验 Pose + Appearance 层，拿到结果文本
 8. 将检验结果写入同一 HTML 文件（图片下方），browser_navigate 打开
    → 预览窗口同时看到对比图 + Pose/Appearance 检验报告
-9. 合并两次检验结果，写入 r{N}/inspection.md 归档
+9. 合并两次检验结果，写入 r{N}/shape_check.html 和 r{N}/appearance_check.html 归档
 10. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
 ```
 
@@ -375,7 +377,17 @@ python3 scripts/step0_preprocess.py \
 > `browser_vision` 返回文本后，替换 `<!-- browser_vision 结果插入此处 -->` 为实际报告内容，重新 `browser_navigate` 即可在预览窗口查看。
 
 **强制存档检查（每轮必做）**：
-- 如果未能成功写入 `prompt.md` 或 `inspection.md`，立即补写。
+- 如果未能成功写入 `prompt.md` 或检验 HTML，立即补写。
+- `inspection.md` 不再单独维护，HTML 文件本身就是完整检验档案。
+
+### 每轮输出
+
+| 产物 | 路径 | 格式 |
+|------|------|------|
+| R1-R5 生成图 | `r{N}/output.png` | PNG |
+| R1-R5 提示词 | `r{N}/prompt.md` | Markdown |
+| R1-R5 Shape 检验 | `r{N}/shape_check.html` | HTML（图+报告） |
+| R1-R5 Pose/Appearance 检验 | `r{N}/appearance_check.html` | HTML（图+报告） |
 
 ### 视觉检验清单（每轮必做）
 
@@ -606,7 +618,8 @@ gpt-image-2 对颜色词的语义扩散极强。仅写 "LIGHT BLUE dress"
 |------|------|------|
 | R1-R5 生成图 | `r{N}/output.png` | PNG |
 | R1-R5 提示词 | `r{N}/prompt.md` | Markdown |
-| R1-R5 检验报告 | `r{N}/inspection.md` | Markdown |
+| R1-R5 Shape 检验 | `r{N}/shape_check.html` | HTML（图+报告） |
+| R1-R5 Pose/Appearance 检验 | `r{N}/appearance_check.html` | HTML（图+报告） |
 
 ---
 
@@ -740,7 +753,7 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 | 面部标记（创可贴/贴纸）被错误放置在头发而非皮肤上 | Step 1 | Prompt 中用 "on the FOREHEAD skin above the bangs, NOT on the hair" 精确定位 |
 | 条纹/针织纹理平面化 | Step 1 | 用 "thick wide knit stripes" / "chunky ribbed knit texture" 替代笼统描述 |
 | 腮红被错误处理成面部贴纸 | Step 1 | 默认忽略参考图中的自然腮红 |
-| 迭代轮次遗漏存档 prompt.md / inspection.md | Step 1 | 每轮结束后必须确认两个文件已写入，未写入则立即补写 |
+| 迭代轮次遗漏存档 prompt.md / 检验 HTML | Step 1 | 每轮结束后必须确认 prompt.md + shape_check.html + appearance_check.html 已写入，未写入则立即补写 |
 | **image_gen edits 端点不稳定**：代理的 `/v1/images/edits` 可能 SSL 错误或超时 | Step 1 | 遇到 edits 失败时自动回退到 generations（text-only），在 prompt 中补全外观描述；双图策略降级为单图 |
 | **对称性偏好导致非对称姿态丢失**：agent 天然倾向对称化处理，容易将参考图的非对称手势（如一手抬脸一手抱物）简化为双手对称 | Step 1 检验 | P2 检验时必须**逐手对比**：左手（画面左侧）在参考图中做什么？右手（画面右侧）在参考图中做什么？生成图是否分别匹配？禁止仅凭"手臂位置大致对"通过 |
 
