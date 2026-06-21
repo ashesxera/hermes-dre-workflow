@@ -1,7 +1,7 @@
 ---
 name: dre-workflow
-description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.2: simplified pipeline — removed Step 1-4, fixed dual-reference strategy only, flat directory structure."
-version: 2.2.0
+description: "Use when user says 搓个娃, 搓娃, 重建人偶, 跑DRE, or DRE workflow with an image. Doll Reconstruction Engineer — convert reference character images into standardized doll figures. v2.3: gpt-image-2 optimized prompt template with Job+Preserve/Change/Do NOT add+Constraints structure."
+version: 2.3.0
 platforms: [macos, linux]
 repository: https://github.com/ashesxera/hermes-dre-workflow
 ---
@@ -124,9 +124,11 @@ Appearance（参考图权威）：
 
 ## 视觉能力调用规范
 
-**本工作流所有视觉分析均使用主模型内部多模态视觉能力，不再调用 `vision_analyze` 工具。**
+**优先使用主模型内部多模态视觉能力。当主模型不具备多模态能力时，回退到 `vision_analyze` 工具。**
 
-标准调用方式：
+### 模式 A：主模型内部视觉（优先）
+
+当主模型支持多模态（如 GPT-5、Claude Sonnet 等）时：
 
 ```
 1. 将目标图片加载到当前对话上下文（作为附件/引用）
@@ -135,6 +137,21 @@ Appearance（参考图权威）：
 4. 将结果写入对应 markdown 文件归档
 ```
 
+### 模式 B：vision_analyze 回退（当主模型非多模态时）
+
+当主模型不支持直接看图（如 DeepSeek、纯文本模型等）时，**必须**使用 `vision_analyze`：
+
+```
+1. 调用 vision_analyze(image_url=生成图, question=检验指令)
+2. 调用 vision_analyze(image_url=模板图, question=模板特征描述指令)
+3. 调用 vision_analyze(image_url=参考图, question=参考特征描述指令)
+4. 最后调用 vision_analyze(image_url=生成图, question=三图对比检验指令)
+   — 在 question 中嵌入前两步获取的模板图和参考图特征描述
+5. 将 vision_analyze 返回的分析结果整理写入报告
+```
+
+**重要**：回退模式下无法做到真正的"同时跨图对比"（`vision_analyze` 每次只看一张图），因此需要先分别获取模板图和参考图的特征描述，再将描述嵌入检验 question 中供辅助视觉模型做逻辑对比。这不是理想方案，但在主模型非多模态时是唯一可行路径。
+
 **多图对比模式**（每轮检验、最终评比）：
 
 ```
@@ -142,6 +159,8 @@ Appearance（参考图权威）：
 2. 主模型一次性跨图对比，直接输出判定结果
 3. 写入报告
 ```
+
+> ⚠️ 多图对比模式仅在主模型支持多模态时可用。回退模式下需逐图分析后逻辑对比。
 
 ---
 
@@ -179,39 +198,73 @@ Appearance（参考图权威）：
 
 **固定策略：每轮必须使用双图**（模板图 + 参考图）。双参考图策略是 DRE 生产轨道的唯一标准策略；参考图承担外观信息传递，提示词仅锁定 Shape 约束和材质气质。
 
-**固定双图提示词模板**（v2.2）：
+**固定双图提示词模板**（v2.3 — 基于 gpt-image-2 最佳实践重构）：
+
+> 模板遵循 wiki [[entities/gpt-image-2]] 的多图编辑规范：
+> Job 头 + Image 编号角色 + Preserve/Change/Do NOT add 三段式 + Constraints 收尾。
+> 三段式标签（`Preserve list` / `Change only` / `Do NOT add`）为 gpt-image-2 验证过的固定英文锚点，
+> 中文 prompt 中也保留这三个英文词。
 
 ```
-A chibi vinyl art toy figure with extreme deformed proportions:
-head ~56% of total height, tiny compact body, short stubby limbs,
-large shoes. The body structure is LOCKED and must NOT be altered.
+Job: Vinyl art toy figure — transfer character identity from reference
+     image onto a locked body template, producing a collectible designer
+     toy in 3D render style.
 
-Reference the attached character image for:
-- hairstyle, hair accessories, hair color
-- clothing style, colors, layering, patterns
-- shoes, scarf, props, accessories
-- pose, stance, head tilt, foot angle, symmetry/asymmetry
-- face decorations (band-aid location, stickers)
+Image 1 (template): Body structure authority — a 1.8-head chibi vinyl
+     toy base with blank face, stubby limbs, and glossy plastic finish.
+     This image defines the SHAPE only. Its proportions, head size,
+     limb thickness, and body silhouette are LOCKED and must NOT change.
 
-The entire figure must have a smooth, glossy plastic texture — no fabric,
-no fuzz, no matte softness. Everything is solid molded vinyl with sharp
-highlights and smooth rounded surfaces.
+Image 2 (reference): Character identity source — provides hairstyle,
+     hair accessories, hair color, clothing style/colors/layering,
+     shoes, props, accessories, pose, stance, head tilt, foot angle,
+     and symmetry/asymmetry. This image defines APPEARANCE and POSE only.
 
-Pure white background, no background objects, no floating props,
-no decorative elements suspended in the air, no text, no watermarks.
+Preserve list:
+- Image 1's body proportions exactly (head ~56% of total height,
+  tiny compact body, short stubby limbs, large shoes)
+- Image 1's blank face — completely smooth egg-shaped surface with
+  NO eyes, NO eyebrows, NO nose, NO mouth, NO blush
+- Image 1's glossy plastic material — smooth, solid molded vinyl
+  with sharp highlights and rounded surfaces
+- Image 1's limb count — EXACTLY two arms and EXACTLY two legs
+- Pure white background with no objects, no floating props,
+  no decorative elements suspended in the air
 
-Smooth glossy vinyl plastic material, soft diffuse lighting,
-3D render style, pure white background.
+Change only:
+- Replace Image 1's hairstyle with Image 2's hairstyle, hair
+  accessories, and hair color (solid vinyl-like masses, rounded
+  blunt tips, no wispy strands)
+- Replace Image 1's clothing with Image 2's clothing style,
+  colors, layering, and patterns (all rendered as glossy plastic)
+- Replace Image 1's shoes with Image 2's shoe style and color
+- Transfer Image 2's props and accessories
+- Transfer Image 2's pose: stance, head tilt, arm positions,
+  foot angle, symmetry or asymmetry
 
-CRITICAL: The face remains completely blank with NO eyes,
-NO eyebrows, NO nose, NO mouth, NO blush.
-EXACTLY two arms and EXACTLY two legs. No extra limbs.
+Do NOT add:
+- Facial features of any kind (eyes, eyebrows, nose, mouth, blush)
+- Extra limbs beyond two arms and two legs
+- Fabric texture, fuzz, matte softness, or any non-plastic material
+- Background objects, floating props, text, watermarks, logos
+- Any elements not present in either Image 1 or Image 2
+
+Constraints:
+- Image numbering matches input order (Image 1 = template, Image 2 = reference)
+- Face remains completely blank — this is the highest priority constraint
+- NO watermark, NO extra text, NO duplicate or fake logo
+- Smooth glossy vinyl plastic material, soft diffuse lighting,
+  3D render style, pure white background
 ```
 
 **模板说明**：
-- `large shoes` — 鞋子样式由参考图决定，不固定约束圆头鞋；对称性/非对称性也由参考图姿态决定，不强制 100% 镜像对称
-- `smooth, glossy plastic texture — no fabric, no fuzz, no matte softness` — 材质强调为强制项，防止参考图的布料/柔绒质感覆盖模板的塑料感
-- 外观信息（发型、服装、配饰、颜色、姿势）完全由参考图承担，提示词仅保留 Shape 锁定 + 材质强制 + 背景清除 + 面部留白约束
+- 遵循 gpt-image-2 多图编辑的**完整生产模板**格式（Job + Image 角色 + 三段式 + Constraints）
+- `Preserve list` 锁定 Shape 层所有硬约束（比例、面部留白、材质、肢体数、背景）
+- `Change only` 明确允许替换的范围（发型、服装、鞋、道具、姿态），防止模型自行扩散变更
+- `Do NOT add` 用否定句明确禁止项——gpt-image-2 对 `NO` 前缀的识别度高于模糊描述
+- 外观信息（发型、服装、配饰、颜色、姿势）完全由参考图承担，提示词仅锁定 Shape + 材质 + 背景 + 面部留白
+- 鞋子样式、对称性/非对称性由参考图决定，不固定约束
+- 材质强调为强制项（`Preserve list` 第三条），防止参考图的布料/柔绒质感覆盖模板的塑料感
 
 **单图回退（仅极端例外）**：仅在 `image_gen` 双图调用超时或参考图无法加载等极端情况下回退。回退时需在 prompt 中补全外观描述。
 
@@ -249,6 +302,15 @@ EXACTLY two arms and EXACTLY two legs. No extra limbs.
    ```
 
 3. 主模型利用内部多模态视觉能力，**实时跨图对比**后输出判定结果。
+
+4. **P2 强制分步检验（防对称化偏好）**：在整体检验之外，必须额外发送两条独立指令：
+   ```
+   请单独描述参考图中左手（画面左侧）在做什么？右手（画面右侧）在做什么？
+   然后对比生成图中左手和右手分别是否匹配。
+   禁止用"手臂位置大致对"通过——必须逐手确认。
+   ```
+   原因：agent 天然倾向对称化处理，容易把非对称手势（一手抬脸一手抱物）
+   简化为双手对称。整体检验时这个细节极易被忽略，必须用独立问题强制关注。
 
 ---
 
@@ -320,7 +382,7 @@ EXACTLY two arms and EXACTLY two legs. No extra limbs.
 | S6 | **Shape** | 面部是否完全留白（无五官痕迹） | 模板图 | 层一 |
 | S7 | **Shape** | 是否存在额外肢体（恰好 2 臂 2 腿） | — | 层一 |
 | P1 | **Pose** | 头部朝向/倾斜是否传递出参考图的氛围 | 参考图 | 层三 |
-| P2 | **Pose** | 手臂位置/姿态是否传递出参考图的氛围 | 参考图 | 层三 |
+| P2 | **Pose** | 手臂位置/姿态是否传递出参考图的氛围（**必须逐手对比**：左手在参考图中做什么？右手在参考图中做什么？生成图是否分别匹配？禁止仅凭"手臂位置大致对"通过） | 参考图 | 层三 |
 | P3 | **Pose** | 腿部位置/重心是否传递出参考图的氛围 | 参考图 | 层三 |
 | P4 | **Pose** | 躯干旋转是否传递出参考图的氛围 | 参考图 | 层三 |
 | A1 | **Appearance** | 发型是否迁移（样式+塑料化特征） | 参考图 | 层二 |
@@ -390,6 +452,27 @@ BOW 4 — medium near left end.
 A small pink band-aid sticker is placed diagonally on the
 upper-right area of the FOREHEAD, above the bangs, on the skin
 surface (NOT on the hair).
+```
+
+**防止单元素变更扩散为全局主题重设计**（gpt-image-2 颜色词语义扩散）：
+```
+gpt-image-2 对颜色词的语义扩散极强。仅写 "LIGHT BLUE dress"
+会导致模型把蓝色扩散到发饰、抱枕、围裙、袜子、鞋子、材质
+等所有元素，理解为"做一个蓝色主题版本"而非"只改裙子颜色"。
+
+对策：在 Change only 段中只写要改的元素，在 Preserve list
+中显式锁定所有不该变的元素（发饰颜色、抱枕颜色、袜子款式、
+鞋子款式、材质类型等）。越具体越好。
+```
+**空间锚定法修正左右手镜像反转**（当左右手不对称姿态被反转时）：
+```
+用画面中已有的非对称道具作为空间锚点。例如：
+- 参考图中白熊在左、棕熊在右
+- 提示词中写："The arm on the SAME SIDE as the WHITE bear is raised
+  near the cheek. The arm on the SAME SIDE as the BROWN bear holds
+  the pillow."
+- 避免使用 "left hand / right hand" 这种容易被镜像反转的术语，
+  改用道具位置做绝对参照。
 ```
 
 ### 输出
@@ -533,6 +616,8 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 | 条纹/针织纹理平面化 | Step 1 | 用 "thick wide knit stripes" / "chunky ribbed knit texture" 替代笼统描述 |
 | 腮红被错误处理成面部贴纸 | Step 1 | 默认忽略参考图中的自然腮红 |
 | 迭代轮次遗漏存档 prompt.md / inspection.md | Step 1 | 每轮结束后必须确认两个文件已写入，未写入则立即补写 |
+| **image_gen edits 端点不稳定**：代理的 `/v1/images/edits` 可能 SSL 错误或超时 | Step 1 | 遇到 edits 失败时自动回退到 generations（text-only），在 prompt 中补全外观描述；双图策略降级为单图 |
+| **对称性偏好导致非对称姿态丢失**：agent 天然倾向对称化处理，容易将参考图的非对称手势（如一手抬脸一手抱物）简化为双手对称 | Step 1 检验 | P2 检验时必须**逐手对比**：左手（画面左侧）在参考图中做什么？右手（画面右侧）在参考图中做什么？生成图是否分别匹配？禁止仅凭"手臂位置大致对"通过 |
 
 ---
 
@@ -540,10 +625,10 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 
 | Step | 方式 | 用途 |
 |------|------|------|
-| Step 1（迭代生成） | `image_gen` + 主模型内部视觉 | 生成 + 每轮检验 |
-| Step 2（最终评比） | 主模型内部视觉 | 深度评比打分 |
+| Step 1（迭代生成） | `image_gen` + 主模型内部视觉（或 `vision_analyze` 回退） | 生成 + 每轮检验 |
+| Step 2（最终评比） | 主模型内部视觉（或 `vision_analyze` 回退） | 深度评比打分 |
 
-**完全移除 `vision_analyze` 调用。**
+**视觉分析优先使用主模型内部能力，非多模态模型回退到 `vision_analyze`。**
 
 ### ⚠️ 重要：image_gen 必须在主会话中直接调用
 
@@ -565,8 +650,9 @@ Hermes 插件为**进程级缓存**：
 | 步骤 | 消耗 | 说明 |
 |------|------|------|
 | Step 1（≤5轮） | ≤5× `image_gen` + 主模型 ≤5 轮看图 | 唯一外部调用 |
-| Step 2 | 主模型 1 轮看多图 | 零外部 API |
-| **总计上限** | **≤5× `image_gen`** | 视觉分析全部内化 |
+| Step 2 | 主模型 1 轮看多图 | 零外部 API（主模型多模态时） |
+| Step 2（回退） | ≤N× `vision_analyze` | 非多模态模型回退时额外消耗 |
+| **总计上限** | **≤5× `image_gen` + ≤N× `vision_analyze`** | 视觉分析优先内化 |
 
 ---
 
@@ -589,11 +675,13 @@ Hermes 插件为**进程级缓存**：
 
 ## 参考案例
 
+- `references/v2.2-simplification-rationale.md` — v2.2 简化原理：为什么从 6-step 简化为 2-step，为什么移除 Step 1-4 的中间文件，以及 R5 迭代驱动的模板进化证据
 - `references/gothic-lolita-starry-night-case-study.md` — v1.x 案例，头部倾斜迭代策略
 - `references/bunny-chibi-case-study.md` — v1.x 案例，面部留白预处理、蝴蝶结编号策略
 - `references/toddler-fish-case-study.md` — v1.x 案例，Provider 回退链、Shape 外观干扰分析
 - `references/lolita-bonnet-girl-case-study.md` — v1.x 案例，多肢体缺陷修复
 - `references/band-aid-placement-case-study.md` — v2.x 案例，创可贴物理附着面判断失误与修复，双图策略优化与三图注入检验法
+- `references/asymmetric-pose-spatial-anchor-case-study.md` — v2.2 案例，非对称姿态被对称化 + 左右手镜像反转，空间锚定法修正
 
 ---
 
