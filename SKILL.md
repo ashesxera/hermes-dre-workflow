@@ -208,34 +208,34 @@ Appearance（参考图权威）：
 ## 执行顺序
 
 ```
-Stage 0: 参考图预处理 → Step 1: 迭代生成（≤5轮） → Step 2: 最终评比
+Step 0: 参考图预处理 → Step 1: 迭代生成（≤5轮） → Step 2: 最终评比
 ```
 
-- Stage 0 每项目执行一次，清理参考图中的背景/五官/漂浮物/头发问题
+- Step 0 每项目执行一次，清理参考图中的背景/五官/漂浮物/头发问题
 - 迭代上限 **5 轮**，超过后强制进入最终评比
 - 最终评比对全部迭代输出打分排序
 
 ### API 资源约束
 
-- Stage 0: 1× Meshy image-to-image（gpt-image-2, 9-12 credits）
+- Step 0: 1× Meshy image-to-image（gpt-image-2, 9-12 credits）
 - 每轮消耗 1 次 `image_gen` 调用
 - 5 轮上限 = 最多 5 次 `image_gen`
 - 视觉分析使用 `browser_vision`，**零外部视觉 API 消耗**
 
 ---
 
-## Stage 0 — 参考图预处理（强制）
+## Step 0 — 参考图预处理（强制）
 
-> 详见 `references/stage0-preprocess.md` | 脚本 `scripts/stage0_preprocess.py`
+> 详见 `references/step0-preprocess.md` | 脚本 `scripts/step0_preprocess.py`
 
 ### 目的
 
-原始参考图可能包含不适合 DRE 管线的元素：复杂背景、面部五官、漂浮道具、卷曲/镂空/翘起的头发。Stage 0 使用 Meshy gpt-image-2 的 image-to-image 接口自动清理。
+原始参考图可能包含不适合 DRE 管线的元素：复杂背景、面部五官、漂浮道具、卷曲/镂空/翘起的头发。Step 0 使用 Meshy gpt-image-2 的 image-to-image 接口自动清理。
 
 ### 执行
 
 ```bash
-python3 scripts/stage0_preprocess.py \
+python3 scripts/step0_preprocess.py \
   ~/DRE_Projects/{project}/input/reference.png \
   ~/DRE_Projects/{project}/input/
 ```
@@ -245,8 +245,8 @@ python3 scripts/stage0_preprocess.py \
 | 产物 | 路径 | 说明 |
 |------|------|------|
 | 预处理参考图 | `input/reference_clean.png` | 替代原始 reference.png |
-| 提示词 | `input/stage0_prompt.md` | 预处理 prompt |
-| API 响应 | `input/stage0_result.json` | Meshy 原始返回 |
+| 提示词 | `input/step0_prompt.md` | 预处理 prompt |
+| API 响应 | `input/step0_result.json` | Meshy 原始返回 |
 
 ### 清理内容
 
@@ -276,7 +276,7 @@ python3 scripts/stage0_preprocess.py \
 预处理完成后，在 `input/preprocess.md` 中记录：
 
 ```markdown
-# Stage 0 预处理报告
+# Step 0 预处理报告
 
 ## 已过滤元素
 - [列出从参考图中识别但不提取的元素]

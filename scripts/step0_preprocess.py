@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stage 0 — Reference Image Preprocessing for DRE Workflow.
+Step 0 — Reference Image Preprocessing for DRE Workflow.
 
 Calls Meshy's gpt-image-2 image-to-image endpoint to clean up the
 reference image before it enters the DRE pipeline.
@@ -14,12 +14,12 @@ Cleans:
     3D printing / vinyl toy production
 
 Usage:
-  python3 stage0_preprocess.py <input_reference.png> <output_dir>
+  python3 step0_preprocess.py <input_reference.png> <output_dir>
 
 Output:
   <output_dir>/reference_clean.png   — preprocessed reference image
-  <output_dir>/stage0_prompt.md      — the prompt used
-  <output_dir>/stage0_result.json    — raw API response
+  <output_dir>/step0_prompt.md      — the prompt used
+  <output_dir>/step0_result.json    — raw API response
 
 Config: reads Meshy API key/model from ~/.hermes/config.yaml
         (image_gen section with provider=meshy)
@@ -232,7 +232,7 @@ def download_image(image_url: str, output_path: Path) -> bool:
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python3 stage0_preprocess.py <input_reference.png> <output_dir>",
+        print("Usage: python3 step0_preprocess.py <input_reference.png> <output_dir>",
               file=sys.stderr)
         sys.exit(1)
 
@@ -247,7 +247,7 @@ def main():
               "~/.hermes/config.yaml or MESHY_API_KEY env var.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Stage 0: Preprocessing reference image")
+    print(f"Step 0: Preprocessing reference image")
     print(f"  Input:  {input_path}")
     print(f"  Output: {output_dir}")
     print(f"  Model:  {cfg['model']}")
@@ -295,15 +295,15 @@ def main():
         sys.exit(1)
 
     # Save artifacts
-    prompt_path = output_dir / "stage0_prompt.md"
-    prompt_path.write_text(f"# Stage 0 Preprocessing Prompt\n\n```\n{PREPROCESS_PROMPT}\n```\n")
+    prompt_path = output_dir / "step0_prompt.md"
+    prompt_path.write_text(f"# Step 0 Preprocessing Prompt\n\n```\n{PREPROCESS_PROMPT}\n```\n")
     print(f"  Saved prompt to {prompt_path}")
 
-    result_path = output_dir / "stage0_result.json"
+    result_path = output_dir / "step0_result.json"
     result_path.write_text(json.dumps(task_data, indent=2))
     print(f"  Saved result to {result_path}")
 
-    print(f"\n✅ Stage 0 complete: {output_path}")
+    print(f"\n✅ Step 0 complete: {output_path}")
     print(f"   Size: {output_path.stat().st_size:,} bytes")
 
 

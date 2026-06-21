@@ -1,11 +1,11 @@
-# Stage 0 — 参考图预处理
+# Step 0 — 参考图预处理
 
 > 在 DRE 迭代生成之前，对原始参考图进行标准化清理。
 > 使用 Meshy gpt-image-2 的 image-to-image 接口完成。
 
 ---
 
-## 为什么需要 Stage 0
+## 为什么需要 Step 0
 
 原始参考图通常包含不适合 DRE 管线的元素：
 
@@ -30,7 +30,7 @@ DRE 工作流启动后、Step 1 第一轮生成前自动执行。
 ### 执行
 
 ```bash
-python3 scripts/stage0_preprocess.py \
+python3 scripts/step0_preprocess.py \
   ~/DRE_Projects/{project}/input/reference.png \
   ~/DRE_Projects/{project}/input/
 ```
@@ -40,8 +40,8 @@ python3 scripts/stage0_preprocess.py \
 | 产物 | 路径 | 说明 |
 |------|------|------|
 | 预处理参考图 | `input/reference_clean.png` | 清理后的参考图，替换原始 `reference.png` 使用 |
-| 提示词 | `input/stage0_prompt.md` | 预处理使用的 prompt |
-| API 响应 | `input/stage0_result.json` | Meshy 原始返回 |
+| 提示词 | `input/step0_prompt.md` | 预处理使用的 prompt |
+| API 响应 | `input/step0_result.json` | Meshy 原始返回 |
 
 ### 后续流程
 
@@ -111,7 +111,7 @@ The character should remain fully recognizable.
 
 ## 容错
 
-- 如果 Meshy API 不可用（key 缺失/网络错误）：跳过 Stage 0，使用原始参考图，打印警告
+- 如果 Meshy API 不可用（key 缺失/网络错误）：跳过 Step 0，使用原始参考图，打印警告
 - 如果预处理结果明显损坏（角色变形/颜色丢失）：保留原始参考图，标记为"预处理失败，使用原始图"
 - 预处理不改变原始 `reference.png`，结果写入 `reference_clean.png`，原始文件始终保留
 
