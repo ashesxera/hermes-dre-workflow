@@ -354,27 +354,68 @@ python3 scripts/step0_preprocess.py \
 
 **HTML 格式规范**：
 
+步骤 5 写入时使用**等待态模板**（ASCII 进度条动画），步骤 6 `browser_vision` 返回后替换为实际报告。
+
 ```html
 <!DOCTYPE html>
-<html><head><style>
-  body { background: #222; color: #ddd; font-family: monospace; padding: 20px; }
-  .compare { display: flex; gap: 10px; margin-bottom: 20px; }
-  .compare img { max-height: 400px; max-width: 48%; object-fit: contain; }
-  .report { background: #1a1a2e; padding: 16px; border-radius: 8px;
-            white-space: pre-wrap; line-height: 1.5; max-width: 900px; }
+<html><head><meta charset="UTF-8"><style>
+  body { background: #222; color: #ddd; font-family: -apple-system, monospace; padding: 20px; }
+  h2 { color: #e2e8f0; margin: 0 0 12px; }
+  .compare { display: flex; gap: 12px; margin-bottom: 20px; }
+  .card { flex: 1; text-align: center; }
+  .card img { max-height: 420px; max-width: 100%; object-fit: contain; border-radius: 6px; }
+  .card p { color: #94a3b8; font-size: 13px; margin: 6px 0 0; }
+  .report { background: #1a1a2e; padding: 20px; border-radius: 8px;
+            white-space: pre-wrap; line-height: 1.6; max-width: 960px; font-size: 14px; }
   .pass { color: #4ade80; } .fail { color: #f87171; } .warn { color: #fbbf24; }
+  .summary { font-size: 16px; font-weight: bold; margin-top: 16px; padding-top: 12px; border-top: 1px solid #334155; }
+  .waiting { text-align: center; padding: 30px 0; }
+  .waiting .frame { font-family: "Courier New", monospace; font-size: 13px; color: #60a5fa; line-height: 1.3; white-space: pre; }
+  .waiting .label { color: #94a3b8; font-size: 13px; margin-top: 12px; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
 </style></head><body>
-  <div class="compare">
-    <img src="file:///.../r{N}/output.png">
-    <img src="file:///.../template.png">
-  </div>
-  <div class="report">
-<!-- browser_vision 结果插入此处 -->
-  </div>
+
+<h2>R{N} [Shape/Pose+Appearance] 层检验</h2>
+
+<div class="compare">
+  <div class="card"><img src="file:///.../r{N}/output.png"><p>生成图 R{N}</p></div>
+  <div class="card"><img src="file:///.../[template|reference].png"><p>[模板图|参考图]</p></div>
+</div>
+
+<div class="report">
+<div class="waiting">
+<div class="frame" id="bar">╔══════════════════════════════════════╗
+║▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║
+║         analyzing shape...          ║
+╚══════════════════════════════════════╝</div>
+<div class="label">⏳ 正在对比图像...</div>
+</div>
+</div>
+
+<script>
+(function(){
+  var f=document.getElementById('bar');
+  var frames=[
+    "╔══════════════════════════════════════╗\n║▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║         analyzing shape...          ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║       extracting proportions...     ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║        checking silhouette...       ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░║\n║        scanning materials...        ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░║\n║        inspecting face area...      ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░║\n║        counting limbs...            ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░║\n║        compiling report...          ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░║\n║        finalizing...                ║\n╚══════════════════════════════════════╝"
+  ];
+  var i=0;
+  setInterval(function(){ f.textContent=frames[i]; i=(i+1)%frames.length; }, 600);
+})();
+</script>
+
 </body></html>
 ```
 
-> `browser_vision` 返回文本后，替换 `<!-- browser_vision 结果插入此处 -->` 为实际报告内容，重新 `browser_navigate` 即可在预览窗口查看。
+> 步骤 5：写入等待态 HTML → `browser_navigate` 打开 → 用户看到图 + 进度条
+> 步骤 6：`browser_vision` 看图检验 → 返回结果文本
+> 步骤 6 后：用结果文本替换 `<div class="waiting">...</div>` 整块 → `browser_navigate` 重新打开 → 用户看到图 + 真实报告
 
 **强制存档检查（每轮必做）**：
 - 如果未能成功写入 `prompt.md` 或检验 HTML，立即补写。
