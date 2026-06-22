@@ -49,22 +49,28 @@ POLL_INTERVAL = 40.0  # seconds
 
 
 def load_meshy_config() -> Dict[str, str]:
-    """Load Meshy API credentials from Hermes config."""
+    """Load Meshy API credentials.
+    
+    Priority: MESHY_API_KEY env var > image_gen config (if provider=meshy) > error.
+    Base URL is always api.meshy.ai — never overridden from image_gen config
+    because Step 0 specifically calls Meshy's image-to-image endpoint.
+    """
     config_path = Path.home() / ".hermes" / "config.yaml"
-    if config_path.exists():
+    api_key = os.getenv("MESHY_API_KEY", "")
+    model = os.getenv("MESHY_MODEL", DEFAULT_MODEL)
+
+    if not api_key and config_path.exists():
         with open(config_path) as f:
             cfg = yaml.safe_load(f) or {}
         ig = cfg.get("image_gen", {})
         if isinstance(ig, dict):
-            return {
-                "api_key": ig.get("api_key", ""),
-                "model": ig.get("model", DEFAULT_MODEL),
-                "base_url": ig.get("base_url", MESHY_BASE_URL),
-            }
+            api_key = ig.get("api_key", "")
+            model = ig.get("model", DEFAULT_MODEL)
+
     return {
-        "api_key": os.getenv("MESHY_API_KEY", ""),
-        "model": os.getenv("MESHY_MODEL", DEFAULT_MODEL),
-        "base_url": os.getenv("MESHY_BASE_URL", MESHY_BASE_URL),
+        "api_key": api_key,
+        "model": model,
+        "base_url": MESHY_BASE_URL,  # always api.meshy.ai, never from config
     }
 
 
