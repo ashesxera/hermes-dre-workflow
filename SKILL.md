@@ -1,6 +1,6 @@
 ---
 name: dre-workflow
-description: "Doll Reconstruction Engineer \u2014 converts reference character images into standardized 1.8-head vinyl toy doll figures. Use when user says \u63c0\u4e2a\u5a03, \u63c0\u5a03, \u91cd\u5efa\u4eba\u5076, \u8dd1DRE, or provides a character image for doll conversion. Do NOT use for general image generation, style transfer, photo editing, or non-doll character design."
+description: "Doll Reconstruction Engineer — converts reference character images into standardized 1.8-head vinyl toy doll figures. Use when user says 捏个娃, 捏娃, 搓个娃, 搓娃, 戳个娃, 戳娃, 跑dre, 重建人偶, or provides a character image for doll conversion. Do NOT use for general image generation, style transfer, photo editing, or non-doll character design."
 version: 2.7.1
 platforms: [macos, linux]
 repository: https://github.com/ashesxera/hermes-dre-workflow
@@ -19,7 +19,7 @@ The output is a vinyl toy figure that preserves the reference character's identi
 
 ## When to Use
 
-Trigger: user says 「揑个娃」「揑娃」「重建人偶」「跑 DRE」or provides a character image for doll conversion.
+Trigger: user says 「捏个娃」「捏娃」「搓个娃」「搓娃」「戳个娃」「戳娃」「跑dre」「重建人偶」or provides a character image for doll conversion.
 
 Do NOT use for: general image generation, style transfer, photo editing, or non-doll character design.
 
@@ -691,7 +691,7 @@ Hermes 插件为**进程级缓存**：
 
 ### 标准流程
 
-用户提供参考角色图，说「跑 DRE 流程」或「重建这个人偶」即可。
+用户提供参考角色图，说「捏个娃」「搓个娃」「戳个娃」「跑dre」或「重建这个人偶」即可。
 
 1. 保存参考图为 `~/DRE_Projects/{project_name}/input/reference.png`
 2. 自动执行迭代生成 → 最终评比
