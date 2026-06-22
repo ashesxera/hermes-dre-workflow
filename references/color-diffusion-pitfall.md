@@ -49,5 +49,5 @@ DO NOT CHANGE:
 - Material (must stay glossy vinyl plastic, NOT porcelain)
 ```
 
-This is now encoded in `references/strategy-text-only.md` as a mandatory
+This is now encoded in the strategy text-only prompt template as a mandatory
 section in every prompt.

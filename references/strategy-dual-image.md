@@ -2,7 +2,6 @@
 
 > 适用 provider：`meshy`（nano-banana-pro / nano-banana-2 / nano-banana）
 > 模式：text-to-image + image-to-image（双参考图）
-> 参见：`references/provider-meshy.md`
 
 ## 核心事实
 
