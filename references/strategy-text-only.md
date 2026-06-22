@@ -2,7 +2,7 @@
 
 > 适用场景：provider 不支持图生图（如 openapitoken gpt-image-2），
 > 仅 `/v1/images/generations` 端点可用。
-> 模板图和参考图**不被模型看到**，仅用于 `browser_vision` 检验阶段。
+> 模板图和参考图**不被模型看到**，仅用于 agent 提取外观特征。
 
 ---
 
@@ -125,7 +125,7 @@ DO NOT CHANGE:
 
 ## 动态调整规则
 
-每轮 `browser_vision` 检验后，根据失败项调整下一轮 prompt。
+每轮 `vision_analyze` 检验后，根据失败项调整下一轮 prompt。
 
 ### Shape 层失败
 

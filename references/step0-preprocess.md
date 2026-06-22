@@ -46,7 +46,6 @@ python3 scripts/step0_preprocess.py \
 ### 后续流程
 
 预处理完成后，DRE 流程使用 `reference_clean.png` 替代原始 `reference.png`：
-- `browser_vision` 检验时对比 `reference_clean.png`
 - 纯文本策略下 agent 从 `reference_clean.png` 提取外观特征
 - 双图策略下 `reference_clean.png` 作为 Image 2 传入
 
