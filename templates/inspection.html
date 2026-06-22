@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>
+  body { background: #222; color: #ddd; font-family: -apple-system, monospace; padding: 20px; }
+  h2 { color: #e2e8f0; margin: 0 0 12px; }
+  .compare { display: flex; gap: 10px; margin-bottom: 20px; }
+  .card { flex: 1; text-align: center; min-width: 0; }
+  .card img { max-height: 350px; max-width: 100%; object-fit: contain; border-radius: 6px; }
+  .card p { color: #94a3b8; font-size: 12px; margin: 5px 0 0; }
+  .report { background: #1a1a2e; padding: 20px; border-radius: 8px;
+            white-space: pre-wrap; line-height: 1.6; max-width: 960px; font-size: 14px; }
+  .pass { color: #4ade80; } .fail { color: #f87171; } .warn { color: #fbbf24; }
+  .section { color: #60a5fa; font-weight: bold; margin-top: 16px; display: block; }
+  .summary { font-size: 16px; font-weight: bold; margin-top: 16px; padding-top: 12px; border-top: 1px solid #334155; }
+  .waiting { text-align: center; padding: 30px 0; }
+  .waiting .frame { font-family: "Courier New", monospace; font-size: 13px; color: #60a5fa; line-height: 1.3; white-space: pre; }
+  .waiting .label { color: #94a3b8; font-size: 13px; margin-top: 12px; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+</style></head><body>
+
+<h2>R{N} 检验报告 — 生成图 vs 模板图 vs 参考图</h2>
+
+<div class="compare">
+  <div class="card"><img src="file:///.../r{N}/output.png"><p>生成图 R{N}</p></div>
+  <div class="card"><img src="file:///.../r{N}/template.png"><p>模板图</p></div>
+  <div class="card"><img src="file:///.../r{N}/reference_clean.png"><p>参考图</p></div>
+</div>
+
+<div class="report">
+<div class="waiting">
+<div class="frame" id="bar">╔══════════════════════════════════════╗
+║▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║
+║         analyzing images...          ║
+╚══════════════════════════════════════╝</div>
+<div class="label">⏳ vision_analyze 正在逐图分析...</div>
+</div>
+</div>
+
+<script>
+(function(){
+  var f=document.getElementById('bar');
+  var frames=[
+    "╔══════════════════════════════════════╗\n║▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║         analyzing output...          ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║       analyzing template...          ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░║\n║        analyzing reference...        ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░║\n║        comparing Shape layer...      ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░║\n║        comparing Pose layer...       ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░║\n║        comparing Appearance...       ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░║\n║        compiling report...           ║\n╚══════════════════════════════════════╝",
+    "╔══════════════════════════════════════╗\n║▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░║\n║        finalizing...                 ║\n╚══════════════════════════════════════╝"
+  ];
+  var i=0;
+  setInterval(function(){ f.textContent=frames[i]; i=(i+1)%frames.length; }, 600);
+})();
+</script>
+
+</body></html>
