@@ -113,23 +113,25 @@ Core pattern: `vision_analyze` each image individually → agent compares text d
 ## 执行顺序
 
 ```
-Step 0: 参考图预处理 → Step 1: 迭代生成（≤5轮） → Step 2: 最终评比
+Step 1 R1（首轮生成+检验） → [Step 0 按需] → Step 1 R2-R5（继续迭代） → Step 2（最终评比）
 ```
 
-- Step 0 每项目执行一次，清理参考图中的背景/五官/漂浮物/头发问题
+- 首轮直接使用原始参考图生成 R1
+- R1 检验后，若发现参考图引入的问题（五官泄漏、背景干扰、漂浮物误判等），触发 Step 0 清理参考图，后续轮次使用 `reference_clean.png`
+- 若 R1 无此类问题，跳过 Step 0
 - 迭代上限 **5 轮**，超过后强制进入最终评比
 - 最终评比对全部迭代输出打分排序
 
 ### API 资源约束
 
-- Step 0: 1× Meshy image-to-image（gpt-image-2, 9-12 credits）
+- Step 0: 1× Meshy image-to-image（gpt-image-2, 9-12 credits），按需触发
 - 每轮消耗 1 次 `image_gen` 调用
 - 5 轮上限 = 最多 5 次 `image_gen`
 - 视觉分析使用 `vision_analyze`（每轮 3 次，Step 2 最多 7 次）
 
 ---
 
-## Step 0 — 参考图预处理（强制）
+## Step 0 — 参考图预处理（按需）
 
 > 详见 `references/step0-preprocess.md` | 脚本 `scripts/step0_preprocess.py`
 
@@ -213,7 +215,7 @@ python3 scripts/step0_preprocess.py \
 |------|------|
 | 双图提示词模板 | 固定模板（下文定义） |
 | 标准模特模板 | `assets/default_template.png` 或 `input/template.png` |
-| 原始参考图 | `input/reference_clean.png` |
+| 参考图 | R1 用 `input/reference.png`；若触发 Step 0，后续轮次用 `input/reference_clean.png` |
 
 ### 图片策略
 
@@ -254,7 +256,10 @@ python3 scripts/step0_preprocess.py \
    agent 对比 A vs C → Pose 层 P1-P4 + Appearance 层 A1-A6 逐项判定
    → 合并为完整检验报告
 8. 报告写入 r{N}/inspection.html
-9. 决策：全部通过 → 进入 Step 2；有失败 → 调整 prompt，进入下一轮
+9. 决策：
+   - 全部通过 → 进入 Step 2
+   - 有失败 → 调整 prompt，进入下一轮
+   - R1 检验后若发现五官泄漏/背景干扰/漂浮物误判 → 先触发 Step 0 清理参考图，后续轮次使用 `reference_clean.png`
 ```
 
 **检验逻辑**：`vision_analyze` 逐图获取文字描述 → agent 文字层面逐项比对 → 写入 `inspection.html`。
@@ -500,7 +505,7 @@ gpt-image-2 对颜色词的语义扩散极强。仅写 "LIGHT BLUE dress"
 |------|------|
 | 全部迭代成品 | `r{N}/output.png`（N ≤ 5） |
 | 标准模特模板 | 模板图 |
-| 参考图 | `input/reference_clean.png` |
+| 参考图 | 若触发 Step 0 用 `reference_clean.png`，否则用 `reference.png` |
 
 ### 操作
 
