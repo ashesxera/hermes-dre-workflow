@@ -24,7 +24,17 @@ Job: Vinyl art toy figure — 1.8-head super-deformed collectible designer
      toy, 3D render, product photography style.
 
 SHAPE RULES (absolute, must not violate):
-- Head is ~56% of total figure height, body is tiny and compact
+- Head is ~56% of total figure height, body is tiny and compact.
+  If the output still looks too tall (head <50%), progressively
+  strengthen: R2 → ~60% + "head width equals or exceeds shoulder
+  width" + "body is a tiny pedestal for the head"; R3 → 65% +
+  "bobblehead proportion" + "head height ALONE equals entire body
+  from neck to feet". gpt-image-2 defaults to ~2.5 heads and
+  resists extreme SD proportions — concrete metaphors (DOMINATES,
+  MASSIVE, bobblehead, pedestal) work better than abstract numbers.
+- Head width equals or exceeds shoulder width — classic SD proportion.
+  Without this, the model makes the head tall but keeps it narrow,
+  resulting in a normal-proportioned figure with a big forehead.
 - Limbs are short, thick, cylindrical stubs — no fingers, no joints, no ankles
 - Entire body silhouette is rounded with no sharp edges or angles
 - Material is smooth glossy vinyl plastic throughout — no fabric texture,
@@ -71,7 +81,7 @@ CONSTRAINTS:
 
 ### SHAPE RULES
 
-**固定不变**。每轮直接复制，不修改。这是唯一不需要动态调整的段。
+**头两条（头身比+头宽）可能需要动态调整**。gpt-image-2 默认倾向 ~2.5 头身，对极端 Q 版比例有天然抵抗力。首轮用模板默认值，若 S1 失败则按模板内注释的渐进策略加强。**其余条（四肢/轮廓/材质/面部/肢体数/背景）固定不变**，每轮直接复制。
 
 ### APPEARANCE
 
@@ -131,7 +141,7 @@ DO NOT CHANGE:
 
 | 失败项 | 调整 |
 |--------|------|
-| S1 头身比偏离 | 在 SHAPE RULES 中加强：`Head is EXACTLY 56% of total height — measure against template` |
+| S1 头身比偏离 | gpt-image-2 默认倾向 ~2.5 头身（头部 ~40%），对极端 Q 版比例（~1:1，头部 ~50-60%）有天然抵抗力。**渐进式加强**：R1 用 `~56%`，若失败 → R2 用 `~60%` + `head width exceeds shoulder width` + `body is a tiny pedestal`，若仍失败 → R3 用 `65%` + `bobblehead proportion` + `head height ALONE equals entire body from neck to feet`。不要一次跳到极限——模型可能忽略过于夸张的数字。 |
 | S2 头部变形 | 加 `Head shape: perfectly oval, slightly wider at top, no elongation` |
 | S3 四肢过细/过长 | 加 `Limbs are THICK cylinders — diameter at least 1/3 of torso width` |
 | S4 轮廓有锋角 | 加 `All edges rounded with minimum 5mm radius — no corners, no points` |
@@ -207,7 +217,17 @@ Job: Vinyl art toy figure — 1.8-head super-deformed collectible designer
      toy, 3D render, product photography style.
 
 SHAPE RULES (absolute, must not violate):
-- Head is ~56% of total figure height, body is tiny and compact
+- Head is ~56% of total figure height, body is tiny and compact.
+  If the output still looks too tall (head <50%), progressively
+  strengthen: R2 → ~60% + "head width equals or exceeds shoulder
+  width" + "body is a tiny pedestal for the head"; R3 → 65% +
+  "bobblehead proportion" + "head height ALONE equals entire body
+  from neck to feet". gpt-image-2 defaults to ~2.5 heads and
+  resists extreme SD proportions — concrete metaphors (DOMINATES,
+  MASSIVE, bobblehead, pedestal) work better than abstract numbers.
+- Head width equals or exceeds shoulder width — classic SD proportion.
+  Without this, the model makes the head tall but keeps it narrow,
+  resulting in a normal-proportioned figure with a big forehead.
 - Limbs are short, thick, cylindrical stubs — no fingers, no joints, no ankles
 - Entire body silhouette is rounded with no sharp edges or angles
 - Material is smooth glossy vinyl plastic throughout — no fabric texture,

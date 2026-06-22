@@ -228,7 +228,7 @@ python3 scripts/step0_preprocess.py \
 
 **纯文本策略要点**（详见 `references/strategy-text-only.md`）：
 - 提示词自包含，不引用 Image 编号（模型看不到图，编号是噪音）
-- SHAPE RULES 段固定不变，每轮直接复制
+- SHAPE RULES 段头两条（头身比+头宽）可能需要动态调整，其余固定
 - APPEARANCE 段逐项精确描述（颜色+款式+位置+数量）
 - POSE 段用道具位置做空间锚点（避免 left/right 镜像反转）
 - DO NOT CHANGE 段逐项锁定不变元素（防颜色扩散）
@@ -602,6 +602,7 @@ Composite = Shape_score × 0.45 + Pose_score × 0.25 + Appearance_score × 0.30
 
 | 陷阱 | 发生阶段 | 对策 |
 |------|----------|------|
+| **gpt-image-2 对极端 Q 版头身比有天然抵抗力**：纯文本模式下默认倾向 ~2.5 头身（头部 ~40%），即使 prompt 写 56% 也常产出 ~40%。需要渐进式加强——R2 写 60% + "head width exceeds shoulder width"，R3 写 65% + "bobblehead proportion"。不要一次跳到极限值。 | Step 1 | 渐进式加强 SHAPE RULES 第一条，详见 `references/strategy-text-only.md` 动态调整规则 |
 | 双图模式下参考图比例污染输出 | Step 1 R1-R2 | 双图极简提示词中加强 Shape 结构前置描述，确保模板结构不被覆盖 |
 | **双图策略材质偏移**：参考图的布料/柔绒质感覆盖模板的塑料感 | Step 1 | 双图极简提示词中必须显式加入 `"smooth, glossy plastic texture — no fabric, no fuzz, no matte softness"` 材质强调 |
 | 五官从参考图泄漏 | Step 1 | 检验清单 S6 + 评分 0 分红线 |
