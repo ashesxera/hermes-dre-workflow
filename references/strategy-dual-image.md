@@ -50,8 +50,14 @@ Change only:
   colors, layering, and patterns (all rendered as glossy plastic)
 - Replace Image 1's shoes with Image 2's shoe style and color
 - Transfer Image 2's props and accessories
-- Transfer Image 2's pose: stance, head tilt, arm positions,
-  foot angle, symmetry or asymmetry
+- Transfer Image 2's pose:
+  - Viewpoint (front/side/back/3/4 angle left or right/high angle/low angle)
+  - Overall posture (standing/sitting/supine/prone/side-lying/kneeling/squatting)
+  - Head posture (pitch + yaw + roll, all three axes independently)
+  - Arm positions (per-arm, asymmetric if present)
+  - Leg position and foot angle
+  - Torso orientation
+  - Symmetry or asymmetry
 
 Do NOT add:
 - Facial features of any kind (eyes, eyebrows, nose, mouth, blush)

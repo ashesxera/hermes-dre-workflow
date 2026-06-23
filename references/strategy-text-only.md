@@ -54,10 +54,18 @@ APPEARANCE:
 - Props: [精确描述：脚边/身边的道具，每个独立描述颜色+位置]
 
 POSE:
-- [精确描述：站姿、头部倾斜、左右手各自的动作和位置、腿部姿态]
-- 如有不对称手势，用道具位置做空间锚点而非 left/right
+- Viewpoint: [正面/侧面/背面/左前45°/右前45°/俯视/仰视]
+- Overall posture: [站姿/坐姿/仰卧/俯卧/侧卧/跪姿/蹲姿/跳跃/行走]
+- Head posture: [俯仰：抬头/低头/平视] + [左右转：左转/右转/正对]
+  + [侧倾：左歪/右歪/端正]，三轴独立描述
+  例："Head tilted slightly to the LEFT, chin slightly DOWN,
+       facing forward (no yaw rotation)"
+- Arms: [左右手各自的动作和位置]
+  - 如有不对称手势，用道具位置做空间锚点而非 left/right
   例："The arm on the WHITE bear side is raised near the cheek.
         The arm on the BROWN bear side holds the pillow."
+- Legs: [腿部姿态]
+- Torso: [躯干朝向]
 
 DO NOT CHANGE:
 - 发型结构、发饰颜色和数量
@@ -153,10 +161,12 @@ DO NOT CHANGE:
 
 | 失败项 | 调整 |
 |--------|------|
-| P1 头部朝向错 | 用空间化语言：`Head tilts slightly toward the WHITE bear side` |
-| P2 手臂位置错 | 逐手重写，用道具锚点。如镜像反转：改用空间锚定法 |
-| P3 腿部错 | `Feet together, toes pointing forward, weight evenly distributed` |
-| P4 躯干错 | `Torso faces directly forward, no twist, no lean` |
+| P0 视角错 | 在 prompt 中显式声明 `Viewpoint: [具体视角]` |
+| P1 整体姿态错 | 在 prompt 中显式声明 `Overall posture: [具体姿态]` |
+| P2 头部朝向错 | 三轴独立描述：`Head tilted [方向] [幅度], chin [上/下/平], facing [方向]` |
+| P3 手臂位置错 | 逐手重写，用道具锚点。如镜像反转：改用空间锚定法 |
+| P4 腿部错 | `Feet together, toes pointing forward, weight evenly distributed` |
+| P5 躯干错 | `Torso faces directly forward, no twist, no lean` |
 
 ### Appearance 层失败
 
@@ -253,11 +263,14 @@ APPEARANCE:
   viewer's LEFT, BROWN bear with WHITE bowtie on viewer's RIGHT
 
 POSE:
-- Standing upright facing forward, feet together
-- The arm on the WHITE bear side is raised near the cheek in a loose fist,
-  as if sleepily rubbing the eye — does NOT touch the pillow
-- The arm on the BROWN bear side holds the PINK heart pillow against chest
-- Two arms are ASYMMETRIC — one up near face, one holding pillow
+- Viewpoint: 正面 (full-frontal)
+- Overall posture: 站姿 (standing upright)
+- Head posture: 平视 (level) + 正对 (facing forward) + 左歪 (tilted slightly LEFT)
+- Arms: ASYMMETRIC — the arm on the WHITE bear side is raised near the cheek
+  in a loose fist, as if sleepily rubbing the eye — does NOT touch the pillow.
+  The arm on the BROWN bear side holds the PINK heart pillow against chest.
+- Legs: feet together, toes pointing forward
+- Torso: facing directly forward, no twist
 
 DO NOT CHANGE:
 - Hair bow color (WHITE)
